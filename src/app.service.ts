@@ -16,52 +16,46 @@ export class AppService {
     @InjectModel(modelTokens.retweets) private readonly retweetsModel: Model<retweetsInterface>
   ) { }
 
-  async setSinceId(): Promise<string> {
-    const lastTweet = await this.retweetsModel
-      .where()
-      .sort({ _id: 'desc' })
-      .findOne();
-
-    if (lastTweet) this.sinceId = lastTweet._id;
-    else {
-      let looping: boolean = true;
-
-      while (looping) {
-        const query: { count: number, screen_name: string, since_id?: string }
-          = { count: 200, screen_name: 'crawlamma' };
-
-        if (this.sinceId)
-          query.since_id = this.sinceId;
-
-        const timeline: { data: { id: number, id_str: string }[] } = await this.twitter
-          .get('statuses/user_timeline', query);
-
-        if (timeline.data.length) {
-          for (const tweet of timeline.data) {
-            if (!await this.retweetsModel.where({ _id: tweet.id_str }).findOne()) {
-              const newTweet = new this.retweetsModel({ _id: tweet.id_str });
-              await newTweet.save();
-            }
-          }
-
-          this.sinceId = last(sortBy(timeline.data, 'id')).id_str;
-        } else looping = false;
-      }
-
+  async update(): Promise<{ since_id: string }> {
+    if (!this.sinceId) {
       const lastTweet = await this.retweetsModel
         .where()
         .sort({ _id: 'desc' })
         .findOne();
 
-      this.sinceId = (lastTweet ? lastTweet._id : 0);
-    }
+      if (lastTweet) this.sinceId = lastTweet._id;
+      else {
+        let looping: boolean = true;
 
-    return this.sinceId;
-  }
+        while (looping) {
+          const query: { count: number, screen_name: string, since_id?: string }
+            = { count: 200, screen_name: 'crawlamma' };
 
-  async update(): Promise<{ since_id: string }> {
-    if (!this.sinceId) {
-      Logger.log(await this.setSinceId(), 'since_id');
+          if (this.sinceId)
+            query.since_id = this.sinceId;
+
+          const timeline: { data: { id: number, id_str: string }[] } = await this.twitter
+            .get('statuses/user_timeline', query);
+
+          if (timeline.data.length) {
+            for (const tweet of timeline.data) {
+              if (!await this.retweetsModel.where({ _id: tweet.id_str }).findOne()) {
+                const newTweet = new this.retweetsModel({ _id: tweet.id_str });
+                await newTweet.save();
+              }
+            }
+
+            this.sinceId = last(sortBy(timeline.data, 'id')).id_str;
+          } else looping = false;
+        }
+
+        const lastTweet = await this.retweetsModel
+          .where()
+          .sort({ _id: 'desc' })
+          .findOne();
+
+        this.sinceId = (lastTweet ? lastTweet._id : 0);
+      }
     }
 
     let looping: boolean = true;
@@ -69,7 +63,7 @@ export class AppService {
 
     while (looping) {
       const tweets: { data: { search_metadata: { since_id_str: string }, statuses: { id_str: string, in_reply_to_status_id_str: string, quoted_status_id_str: string }[] } } = await this.twitter
-        .get('search/tweets', { count: 10, lang: 'ml', q: '* AND -filter:replies AND -filter:retweets', result_type: 'recent', since_id: this.sinceId });
+        .get('search/tweets', { count: 5, lang: 'ml', q: '* AND -filter:replies AND -filter:retweets', result_type: 'recent', since_id: this.sinceId });
 
       if (tweets.data.statuses.length) this.sinceId = tweets.data.search_metadata.since_id_str;
       else looping = false;
@@ -78,7 +72,7 @@ export class AppService {
         if (!tweet.in_reply_to_status_id_str
           && !tweet.quoted_status_id_str) {
           if (!await this.retweetsModel.where({ _id: tweet.id_str }).findOne()) {
-            if (10 < i++) looping = false;
+            if (5 < i++) looping = false;
             else await new Promise(resolve =>
               setTimeout(async () => {
                 try {
@@ -95,7 +89,7 @@ export class AppService {
                 }
 
                 resolve(true);
-              }, 1000 * 10));
+              }, 1000 * 5));
           }
         }
       }
