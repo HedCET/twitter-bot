@@ -95,7 +95,7 @@ export class AppService {
                 }
 
                 resolve(true);
-              }, 1000 * 3));
+              }, 1000 * 10));
           }
         }
       }
