@@ -1,0 +1,27 @@
+# random
+.development
+/dist
+
+# npm
+npm-debug.log*
+package-lock.json
+/node_modules
+
+# Logs
+*.log
+lerna-debug.log*
+/logs
+
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+
+# IDE - VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
