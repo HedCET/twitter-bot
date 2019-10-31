@@ -69,7 +69,7 @@ export class AppService {
 
     while (looping) {
       const tweets: { data: { search_metadata: { since_id_str: string }, statuses: { id_str: string, in_reply_to_status_id_str: string, quoted_status_id_str: string }[] } } = await this.twitter
-        .get('search/tweets', { count: 10, lang: 'ml', q: '*', result_type: 'recent', since_id: this.sinceId });
+        .get('search/tweets', { count: 10, lang: 'ml', q: '* AND -filter:replies AND -filter:retweets', result_type: 'recent', since_id: this.sinceId });
 
       if (tweets.data.statuses.length) this.sinceId = tweets.data.search_metadata.since_id_str;
       else looping = false;
