@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { find, last, shuffle, sortBy } from 'lodash';
+import * as moment from 'moment';
 import { Model } from 'mongoose';
 import * as twit from 'twit';
 
@@ -59,9 +60,9 @@ export class AppService {
     }
 
     const topFavorited = await this.usersModel
-      .where()
+      .where({ time: { $gte: moment().subtract(7, 'days').toDate() } })
       .sort({ favourites_count: 'desc' })
-      .limit(200)
+      .limit(100)
       .find();
 
     let looping: boolean = true;
@@ -119,9 +120,9 @@ export class AppService {
     //   .find();
 
     // const topFollowingUsers = await this.usersModel
-    //   .where()
+    //   .where({ time: { $gte: moment().subtract(7, 'days').toDate() } })
     //   .sort({ friends_count: 'desc' })
-    //   .limit(200)
+    //   .limit(100)
     //   .find();
 
     // for (const followingUser of followingUsers) {
