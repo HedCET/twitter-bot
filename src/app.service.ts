@@ -87,7 +87,7 @@ export class AppService {
           else {
             await new Promise(resolve => setTimeout(async () => {
               try {
-                await this.twitter.post('statuses/retweet/:id', { id: tweet.id_str });
+                await this.twitter.post('statuses/retweet', { id: tweet.id_str });
                 await new this.retweetsModel({ _id: tweet.id_str }).save();
                 Logger.log(tweet.user.screen_name, `retweet/${tweet.id_str}`);
               } catch (e) {
@@ -103,7 +103,7 @@ export class AppService {
           && find(topFavorited, { _id: tweet.user.screen_name })) {
           await new Promise(resolve => setTimeout(async () => {
             try {
-              await this.twitter.post('favorites/create/:id', { id: tweet.id_str });
+              await this.twitter.post('favorites/create', { id: tweet.id_str });
               Logger.log(tweet.user.screen_name, `favorites/${tweet.id_str}`);
             } catch (e) {
               Logger.log(e.message || e, `favorites/${tweet.id_str}`);
