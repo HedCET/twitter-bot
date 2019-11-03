@@ -77,7 +77,7 @@ export class AppService {
 
       for (const tweet of shuffle(tweets.data.statuses)) {
         await this.usersModel.updateOne({ _id: tweet.user.screen_name },
-          { $set: { favourites_count: tweet.user.favourites_count, friends_count: tweet.user.friends_count } },
+          { $set: { favourites_count: tweet.user.favourites_count, friends_count: tweet.user.friends_count, time: moment().toDate() } },
           { upsert: true });
 
         if (!tweet.is_quote_status
@@ -99,7 +99,7 @@ export class AppService {
           }
         }
 
-        if (tweet.favorited
+        if (!tweet.favorited
           && find(topFavorited, { _id: tweet.user.screen_name })) {
           await new Promise(resolve => setTimeout(async () => {
             try {
