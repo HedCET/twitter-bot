@@ -61,7 +61,7 @@ export class AppService {
     const topFavorited = await this.usersModel
       .where()
       .sort({ favourites_count: 'desc' })
-      .limit(100)
+      .limit(200)
       .find();
 
     let looping: boolean = true;
@@ -121,7 +121,7 @@ export class AppService {
     const topFollowingUsers = await this.usersModel
       .where()
       .sort({ friends_count: 'desc' })
-      .limit(100)
+      .limit(200)
       .find();
 
     for (const followingUser of followingUsers) {
