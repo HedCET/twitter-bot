@@ -104,6 +104,7 @@ export class AppService {
                 Logger.log(tweet.user.screen_name, `retweet/${tweet.id_str}`);
               } catch (e) {
                 Logger.log(e.message || e, `retweet/${tweet.id_str}`);
+                if ((e.message || '').match(/ blocked /i)) Logger.log(tweet.user.screen_name, 'retweet/blocked');
               }
 
               resolve(true);
@@ -119,6 +120,7 @@ export class AppService {
               Logger.log(tweet.user.screen_name, `favorites/${tweet.id_str}`);
             } catch (e) {
               Logger.log(e.message || e, `favorites/${tweet.id_str}`);
+              if ((e.message || '').match(/ blocked /i)) Logger.log(tweet.user.screen_name, 'favorites/blocked');
             }
 
             resolve(true);
@@ -162,6 +164,7 @@ export class AppService {
     //         Logger.log(topFollowingUser._id, 'friendships/create');
     //       } catch (e) {
     //         Logger.log(e.message || e, 'friendships/create');
+    //         if ((e.message || '').match(/ blocked /i)) Logger.log(topFollowingUser._id, 'friendships/blocked');
     //       }
 
     //       resolve(true);
