@@ -29,6 +29,9 @@ const schema = {
 
   TWITTER_CONSUMER_SECRET: joi.string()
     .required(),
+
+  TWITTER_SEARCH_QUERY: joi.string()
+    .default('* AND -filter:replies AND -filter:retweets'),
 };
 
 const { error, value } = joi.validate({

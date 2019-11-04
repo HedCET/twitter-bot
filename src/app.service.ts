@@ -6,6 +6,7 @@ import { Model } from 'mongoose';
 import * as twit from 'twit';
 
 import { modelTokens } from './db.imports';
+import { env } from './env.validations';
 import { favoritesInterface } from './favorites.interface';
 import { retweetsInterface } from './retweets,interface';
 import { usersInterface } from './users.interface';
@@ -23,71 +24,29 @@ export class AppService {
   ) { }
 
   async update() {
-    if (!this.since_id) {
+    let looping: boolean = (0 < this.wait-- ? false : true);
+    let retweetsThreshold: number = 6;
+
+    while (looping) {
       const lastTweet = await this.retweetsModel
         .where()
         .sort({ _id: 'desc' })
         .findOne();
 
-      if (lastTweet) this.since_id = lastTweet._id;
-      else {
-        let looping: boolean = true;
+      if (lastTweet)
+        this.since_id = lastTweet._id;
 
-        while (looping) {
-          const query: { count: number, screen_name: string, since_id?: string }
-            = { count: 200, screen_name: 'crawlamma' };
+      const tweets: { data: { search_metadata: { max_id_str: string }, statuses: { entities: { urls: object[] }, favorited: boolean, id_str: string, is_quote_status: boolean, retweeted: boolean, user: { favourites_count: number, followers_count: number, friends_count: number, screen_name: string } }[] } } = await this.twitter
+        .get('search/tweets', { count: 100, lang: 'ml', q: env.TWITTER_SEARCH_QUERY, result_type: 'recent', since_id: this.since_id });
 
-          if (this.since_id)
-            query.since_id = this.since_id;
+      if (tweets.data.statuses.length) this.since_id = tweets.data.search_metadata.max_id_str;
+      else break;
 
-          await new Promise(resolve => setTimeout(async () => {
-            try {
-              const timeline: { data: { id: number, id_str: string }[] } = await this.twitter
-                .get('statuses/user_timeline', query);
-
-              if (timeline.data.length) {
-                for (const tweet of timeline.data) {
-                  if (!await this.retweetsModel.where({ _id: tweet.id_str }).findOne())
-                    await new this.retweetsModel({ _id: tweet.id_str }).save();
-                }
-
-                this.since_id = last(sortBy(timeline.data, 'id')).id_str;
-              } else looping = false;
-
-              Logger.log(this.since_id, 'statuses/user_timeline');
-            } catch (e) {
-              Logger.log(e.message || e, 'statuses/user_timeline');
-            }
-
-            resolve(true);
-          }, 1000 * 5));
-        }
-
-        const lastTweet = await this.retweetsModel
-          .where()
-          .sort({ _id: 'desc' })
-          .findOne();
-
-        if (lastTweet)
-          this.since_id = lastTweet._id;
-      }
-    }
-
-    let looping: boolean = (this.wait-- < 1 ? true : false);
-    let i: number = 1;
-
-    while (looping) {
       const topFavorited = await this.usersModel
-        .where({ time: { $gte: moment().subtract(1, 'days').toDate() } })
+        .where({ time: { $gte: moment().subtract(3, 'days').toDate() } })
         .sort({ favourites_count: 'desc' })
         .limit(100)
         .find();
-
-      const tweets: { data: { search_metadata: { max_id_str: string }, statuses: { entities: { urls: object[] }, favorited: boolean, id_str: string, is_quote_status: boolean, retweeted: boolean, user: { favourites_count: number, followers_count: number, friends_count: number, screen_name: string } }[] } } = await this.twitter
-        .get('search/tweets', { count: 100, lang: 'ml', q: '* AND -@crawlamma AND -filter:replies AND -filter:retweets', result_type: 'recent', since_id: this.since_id });
-
-      if (tweets.data.statuses.length) this.since_id = tweets.data.search_metadata.max_id_str;
-      else looping = false;
 
       for (const tweet of shuffle(tweets.data.statuses)) {
         await this.usersModel.updateOne({ _id: tweet.user.screen_name },
@@ -98,21 +57,22 @@ export class AppService {
           && (!tweet.is_quote_status || (tweet.is_quote_status && 10 < tweet.user.followers_count))
           && !tweet.retweeted
           && !await this.retweetsModel.where({ _id: tweet.id_str }).findOne()) {
-          if (5 < i++) looping = false;
+          if (retweetsThreshold-- < 0
+            || 0 < this.wait) looping = false;
           else {
             await new Promise(resolve => setTimeout(async () => {
               try {
                 await this.twitter.post('statuses/retweet', { id: tweet.id_str });
                 await new this.retweetsModel({ _id: tweet.id_str }).save();
-                Logger.log(tweet.user.screen_name, `retweet/${tweet.id_str}`);
+                Logger.log(true, `statuses/retweet/${tweet.user.screen_name}/${tweet.id_str}`);
               } catch (e) {
-                Logger.log(e.message || e, `retweet/${tweet.id_str}`);
-                if ((e.message || '').match(/ blocked /i)) {
-                  await this.twitter.post('statuses/update', { status: `@${tweet.user.screen_name} blocked you, you can't retweet this https://twitter.com/${tweet.user.screen_name}/status/${tweet.id_str}` });
-                  await new this.retweetsModel({ _id: tweet.id_str }).save();
-                  Logger.log(tweet.user.screen_name, 'retweet/blocked');
-                }
-                if ((e.message || '').match(/ over daily status update limit/i)) this.wait = 10;
+                Logger.log(e.message || e, `statuses/retweet/${tweet.user.screen_name}/${tweet.id_str}`);
+                if ((e.message || '').match(/ over daily status update limit/i)) this.wait = 1;
+                // if ((e.message || '').match(/ blocked /i)) {
+                //   await this.twitter.post('statuses/update', { status: `${tweet.user.screen_name} blocked you, you can't retweet this https://twitter.com/${tweet.user.screen_name}/status/${tweet.id_str}` });
+                //   await new this.retweetsModel({ _id: tweet.id_str }).save();
+                //   Logger.log(true, `statuses/update/${tweet.user.screen_name}/${tweet.id_str}`);
+                // }
               }
 
               resolve(true);
@@ -127,10 +87,9 @@ export class AppService {
             try {
               await this.twitter.post('favorites/create', { id: tweet.id_str });
               await new this.favoritesModel({ _id: tweet.id_str }).save();
-              Logger.log(tweet.user.screen_name, `favorites/${tweet.id_str}`);
+              Logger.log(true, `favorites/create/${tweet.user.screen_name}/${tweet.id_str}`);
             } catch (e) {
-              Logger.log(e.message || e, `favorites/${tweet.id_str}`);
-              if ((e.message || '').match(/ blocked /i)) Logger.log(tweet.user.screen_name, 'favorites/blocked');
+              Logger.log(e.message || e, `favorites/create/${tweet.user.screen_name}/${tweet.id_str}`);
             }
 
             resolve(true);
@@ -138,48 +97,47 @@ export class AppService {
         }
       }
 
-      // const followingUsers = await this.usersModel
-      //   .where({ friends: true })
-      //   .find();
+      const followingUsers = await this.usersModel
+        .where({ friends: true })
+        .find();
 
-      // const topFollowingUsers = await this.usersModel
-      //   .where({ time: { $gte: moment().subtract(7, 'days').toDate() } })
-      //   .sort({ friends_count: 'desc' })
-      //   .limit(100)
-      //   .find();
+      const topFollowingUsers = await this.usersModel
+        .where({ time: { $gte: moment().subtract(7, 'days').toDate() } })
+        .sort({ friends_count: 'desc' })
+        .limit(100)
+        .find();
 
-      // for (const followingUser of followingUsers) {
-      //   if (!find(topFollowingUsers, { _id: followingUser._id })) {
-      //     await new Promise(resolve => setTimeout(async () => {
-      //       try {
-      //         await this.twitter.post('friendships/destroy', { screen_name: followingUser._id });
-      //         await this.usersModel.updateOne({ _id: followingUser._id }, { $unset: { friends: true } });
-      //         Logger.log(followingUser._id, 'friendships/destroy');
-      //       } catch (e) {
-      //         Logger.log(e.message || e, 'friendships/destroy');
-      //       }
+      for (const followingUser of followingUsers) {
+        if (!find(topFollowingUsers, { _id: followingUser._id })) {
+          await new Promise(resolve => setTimeout(async () => {
+            try {
+              await this.twitter.post('friendships/destroy', { screen_name: followingUser._id });
+              await this.usersModel.updateOne({ _id: followingUser._id }, { $unset: { friends: true } });
+              Logger.log(true, `friendships/destroy/${followingUser._id}`);
+            } catch (e) {
+              Logger.log(e.message || e, `friendships/destroy/${followingUser._id}`);
+            }
 
-      //       resolve(true);
-      //     }, 1000 * 5));
-      //   }
-      // }
+            resolve(true);
+          }, 1000 * 5));
+        }
+      }
 
-      // for (const topFollowingUser of topFollowingUsers) {
-      //   if (!find(followingUsers, { _id: topFollowingUser._id })) {
-      //     await new Promise(resolve => setTimeout(async () => {
-      //       try {
-      //         await this.twitter.post('friendships/create', { screen_name: topFollowingUser._id });
-      //         await this.usersModel.updateOne({ _id: topFollowingUser._id }, { $set: { friends: true } });
-      //         Logger.log(topFollowingUser._id, 'friendships/create');
-      //       } catch (e) {
-      //         Logger.log(e.message || e, 'friendships/create');
-      //         if ((e.message || '').match(/ blocked /i)) Logger.log(topFollowingUser._id, 'friendships/blocked');
-      //       }
+      for (const topFollowingUser of topFollowingUsers) {
+        if (!find(followingUsers, { _id: topFollowingUser._id })) {
+          await new Promise(resolve => setTimeout(async () => {
+            try {
+              await this.twitter.post('friendships/create', { screen_name: topFollowingUser._id });
+              await this.usersModel.updateOne({ _id: topFollowingUser._id }, { $set: { friends: true } });
+              Logger.log(true, `friendships/create/${topFollowingUser._id}`);
+            } catch (e) {
+              Logger.log(e.message || e, `friendships/create/${topFollowingUser._id}`);
+            }
 
-      //       resolve(true);
-      //     }, 1000 * 5));
-      //   }
-      // }
+            resolve(true);
+          }, 1000 * 5));
+        }
+      }
     }
 
     return { since_id: this.since_id };
