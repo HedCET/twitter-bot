@@ -6,6 +6,7 @@ import { Model } from 'mongoose';
 import * as twit from 'twit';
 
 import { modelTokens } from './db.imports';
+import { favoritesInterface } from './favorites.interface';
 import { retweetsInterface } from './retweets,interface';
 import { usersInterface } from './users.interface';
 
@@ -15,6 +16,7 @@ export class AppService {
 
   constructor(
     @Inject('TWITTER') private readonly twitter: typeof twit,
+    @InjectModel(modelTokens.favorites) private readonly favoritesModel: Model<favoritesInterface>,
     @InjectModel(modelTokens.retweets) private readonly retweetsModel: Model<retweetsInterface>,
     @InjectModel(modelTokens.users) private readonly usersModel: Model<usersInterface>
   ) { }
@@ -113,10 +115,12 @@ export class AppService {
         }
 
         if (!tweet.favorited
-          && find(topFavorited, { _id: tweet.user.screen_name })) {
+          && find(topFavorited, { _id: tweet.user.screen_name })
+          && !await this.favoritesModel.where({ _id: tweet.id_str }).findOne()) {
           await new Promise(resolve => setTimeout(async () => {
             try {
               await this.twitter.post('favorites/create', { id: tweet.id_str });
+              await new this.favoritesModel({ _id: tweet.id_str }).save();
               Logger.log(tweet.user.screen_name, `favorites/${tweet.id_str}`);
             } catch (e) {
               Logger.log(e.message || e, `favorites/${tweet.id_str}`);
