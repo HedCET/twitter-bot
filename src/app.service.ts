@@ -69,7 +69,7 @@ export class AppService {
                 Logger.log(e.message || e, `statuses/retweet/${tweet.user.screen_name}/${tweet.id_str}`);
                 if ((e.message || '').match(/ over daily status update limit/i)) this.wait = 1;
                 // if ((e.message || '').match(/ blocked /i)) {
-                //   await this.twitter.post('statuses/update', { status: `${tweet.user.screen_name} blocked you, you can't retweet this https://twitter.com/${tweet.user.screen_name}/status/${tweet.id_str}` });
+                //   await this.twitter.post('statuses/update', { status: `@${tweet.user.screen_name} blocked you, you can't retweet this https://twitter.com/${tweet.user.screen_name}/status/${tweet.id_str}` });
                 //   await new this.retweetsModel({ _id: tweet.id_str }).save();
                 //   Logger.log(true, `statuses/update/${tweet.user.screen_name}/${tweet.id_str}`);
                 // }
