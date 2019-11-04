@@ -112,7 +112,7 @@ export class AppService {
                   await new this.retweetsModel({ _id: tweet.id_str }).save();
                   Logger.log(tweet.user.screen_name, 'retweet/blocked');
                 }
-                if ((e.message || '').match(/ over daily status update limit /i)) this.wait = 10;
+                if ((e.message || '').match(/ over daily status update limit/i)) this.wait = 10;
               }
 
               resolve(true);
