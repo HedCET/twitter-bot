@@ -82,7 +82,7 @@ export class AppService {
     let i: number = 1;
 
     while (looping) {
-      const tweets: { data: { search_metadata: { max_id_str: string }, statuses: { entities: { urls: object[] }, favorited: boolean, id_str: string, is_quote_status: boolean, retweeted: boolean, user: { favourites_count: number, friends_count: number, screen_name: string } }[] } } = await this.twitter
+      const tweets: { data: { search_metadata: { max_id_str: string }, statuses: { entities: { urls: object[] }, favorited: boolean, id_str: string, is_quote_status: boolean, retweeted: boolean, user: { favourites_count: number, followers_count: number, friends_count: number, screen_name: string } }[] } } = await this.twitter
         .get('search/tweets', { count: 100, lang: 'ml', q: '* AND -@crawlamma AND -filter:replies AND -filter:retweets', result_type: 'recent', since_id: this.since_id });
 
       if (tweets.data.statuses.length) this.since_id = tweets.data.search_metadata.max_id_str;
@@ -93,8 +93,8 @@ export class AppService {
           { $set: { favourites_count: tweet.user.favourites_count, friends_count: tweet.user.friends_count, time: moment().toDate() } },
           { upsert: true });
 
-        if ((!tweet.entities.urls.length || (tweet.entities.urls.length && 100 < tweet.user.friends_count))
-          && (!tweet.is_quote_status || (tweet.is_quote_status && 100 < tweet.user.friends_count))
+        if ((!tweet.entities.urls.length || (tweet.entities.urls.length && 100 < tweet.user.followers_count))
+          && (!tweet.is_quote_status || (tweet.is_quote_status && 10 < tweet.user.followers_count))
           && !tweet.retweeted
           && !await this.retweetsModel.where({ _id: tweet.id_str }).findOne()) {
           if (5 < i++) looping = false;
