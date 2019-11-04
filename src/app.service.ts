@@ -73,7 +73,7 @@ export class AppService {
     }
 
     const topFavorited = await this.usersModel
-      .where({ time: { $gte: moment().subtract(7, 'days').toDate() } })
+      .where({ time: { $gte: moment().subtract(1, 'days').toDate() } })
       .sort({ favourites_count: 'desc' })
       .limit(100)
       .find();
@@ -94,7 +94,7 @@ export class AppService {
           { upsert: true });
 
         if ((!tweet.entities.urls.length || (tweet.entities.urls.length && 100 < tweet.user.friends_count))
-          && (!tweet.is_quote_status || (tweet.is_quote_status && 10 < tweet.user.friends_count))
+          && (!tweet.is_quote_status || (tweet.is_quote_status && 100 < tweet.user.friends_count))
           && !tweet.retweeted
           && !await this.retweetsModel.where({ _id: tweet.id_str }).findOne()) {
           if (5 < i++) looping = false;
