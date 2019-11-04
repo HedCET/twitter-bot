@@ -1,7 +1,7 @@
 twitter malayalam retweet bot build with NestJS, required ```.development``` file @root with following environment variables
 
 ```
-MONGO_URL="mongodb://user:password@x.mlab.com:39928/db"
+MONGO_URL="mongodb://user:password@x.mlab.com:port/db"
 TWITTER_ACCESS_TOKEN=""
 TWITTER_ACCESS_TOKEN_SECRET=""
 TWITTER_CONSUMER_KEY=""
