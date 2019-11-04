@@ -108,7 +108,7 @@ export class AppService {
               } catch (e) {
                 Logger.log(e.message || e, `retweet/${tweet.id_str}`);
                 if ((e.message || '').match(/ blocked /i)) {
-                  await this.twitter.post('statuses/update', { status: `@${tweet.user.screen_name} blocked you\nyou can't retweet this https://twitter.com/${tweet.user.screen_name}/status/${tweet.id_str}` });
+                  await this.twitter.post('statuses/update', { status: `@${tweet.user.screen_name} blocked you, you can't retweet this https://twitter.com/${tweet.user.screen_name}/status/${tweet.id_str}` });
                   await new this.retweetsModel({ _id: tweet.id_str }).save();
                   Logger.log(tweet.user.screen_name, 'retweet/blocked');
                 }
