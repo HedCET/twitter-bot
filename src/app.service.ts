@@ -36,7 +36,7 @@ export class AppService {
       if (lastTweet)
         this.since_id = lastTweet._id;
 
-      const tweets: { data: { search_metadata: { max_id_str: string }, statuses: { entities: { urls: object[] }, favorited: boolean, id_str: string, is_quote_status: boolean, retweeted: boolean, user: { favourites_count: number, followers_count: number, friends_count: number, screen_name: string } }[] } } = await this.twitter
+      const tweets: { data: { search_metadata: { max_id_str: string }, statuses: { created_at: string, entities: { urls: object[] }, favorited: boolean, id_str: string, is_quote_status: boolean, retweeted: boolean, user: { favourites_count: number, followers_count: number, friends_count: number, screen_name: string } }[] } } = await this.twitter
         .get('search/tweets', { count: 100, lang: 'ml', q: env.TWITTER_SEARCH_QUERY, result_type: 'recent', since_id: this.since_id });
 
       if (tweets.data.statuses.length) this.since_id = tweets.data.search_metadata.max_id_str;
