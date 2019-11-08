@@ -10,7 +10,7 @@ export class AppController {
   index() { return { message: 'User' }; }
 
   @Get('update')
-  async update(@Query('services') services = 'favorite') {
+  async update(@Query('services') services = 'favorites') {
     setTimeout(async () => Logger.log(await this.appService.update(services.split('|')), 'AppController/update'));
     return true;
   }

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { find, last, shuffle, sortBy } from 'lodash';
+import { find, shuffle, sortBy } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 import * as twit from 'twit';
@@ -8,6 +8,7 @@ import * as twit from 'twit';
 import { modelTokens } from './db.imports';
 import { env } from './env.validations';
 import { favoritesInterface } from './favorites.interface';
+import { messagesInterface } from './messages,interface';
 import { retweetsInterface } from './retweets,interface';
 import { usersInterface } from './users.interface';
 
@@ -19,6 +20,7 @@ export class AppService {
   constructor(
     @Inject('TWITTER') private readonly twitter: typeof twit,
     @InjectModel(modelTokens.favorites) private readonly favoritesModel: Model<favoritesInterface>,
+    @InjectModel(modelTokens.messages) private readonly messagesModel: Model<messagesInterface>,
     @InjectModel(modelTokens.retweets) private readonly retweetsModel: Model<retweetsInterface>,
     @InjectModel(modelTokens.users) private readonly usersModel: Model<usersInterface>
   ) { }
@@ -75,7 +77,7 @@ export class AppService {
             }
           }
 
-          if (-1 < services.indexOf('favorite')) {
+          if (-1 < services.indexOf('favorites')) {
             const topFavorited = await this.usersModel
               .where({ time: { $gte: moment().subtract(7, 'days').toDate() } })
               .sort({ favourites_count: 'desc' })
@@ -98,6 +100,55 @@ export class AppService {
               }, 1000 * 5));
             }
           }
+        }
+      }
+    }
+
+    if (-1 < services.indexOf('messages')) {
+      let cursor;
+
+      for (let i = 0; i < 15; i++) {
+        const options: { count: number, cursor?: string } = { count: 50 };
+
+        if (cursor)
+          options.cursor = cursor;
+
+        const messages = await this.twitter.get('direct_messages/events/list', options);
+
+        if (messages.data.next_cursor) cursor = messages.data.next_cursor;
+        else i = 15;
+
+        for (const message of sortBy(messages.data.events, 'id').reverse()) {
+          if (!await this.messagesModel.where({ _id: message.id }).findOne()) {
+            await new this.messagesModel({ _id: message.id }).save();
+
+            if (message.message_create.sender_id === '124361980') {
+              if (message.message_create.message_data.entities.urls.length) {
+                const data = (message.message_create.message_data.entities.urls[0].expanded_url || '')
+                  .match(/twitter\.com\/([^/]+)\/status\/([0-9a-z]+)$/i);
+
+                if (data) {
+                  await new Promise(resolve => setTimeout(async () => {
+                    try {
+                      await this.twitter.post('statuses/unretweet', { id: data[2] });
+                      await this.retweetsModel.deleteOne({ _id: data[2] });
+                      Logger.log(true, `statuses/unretweet/${data[1]}/${data[2]}`);
+                    } catch (e) {
+                      Logger.log(e.message || e, `statuses/unretweet/${data[1]}/${data[2]}`);
+                    }
+
+                    resolve(true);
+                  }, 1000 * 5));
+                }
+              }
+
+              if (message.message_create.message_data.entities.user_mentions.length) {
+                const user = await this.usersModel.where({ _id: message.message_create.message_data.entities.user_mentions[0].screen_name }).findOne();
+                if (user) await this.usersModel.updateOne({ _id: user._id }, { $set: { blocked: !user.blocked } });
+                Logger.log(user ? !user.blocked : 'userNotFound', `blocked/${message.message_create.message_data.entities.user_mentions[0].screen_name}`);
+              }
+            }
+          } else i = 15;
         }
       }
     }
