@@ -97,47 +97,47 @@ export class AppService {
         }
       }
 
-      const followingUsers = await this.usersModel
-        .where({ friends: true })
-        .find();
+      // const followingUsers = await this.usersModel
+      //   .where({ friends: true })
+      //   .find();
 
-      const topFollowingUsers = await this.usersModel
-        .where({ time: { $gte: moment().subtract(7, 'days').toDate() } })
-        .sort({ friends_count: 'desc' })
-        .limit(100)
-        .find();
+      // const topFollowingUsers = await this.usersModel
+      //   .where({ time: { $gte: moment().subtract(7, 'days').toDate() } })
+      //   .sort({ friends_count: 'desc' })
+      //   .limit(100)
+      //   .find();
 
-      for (const followingUser of followingUsers) {
-        if (!find(topFollowingUsers, { _id: followingUser._id })) {
-          await new Promise(resolve => setTimeout(async () => {
-            try {
-              await this.twitter.post('friendships/destroy', { screen_name: followingUser._id });
-              await this.usersModel.updateOne({ _id: followingUser._id }, { $unset: { friends: true } });
-              Logger.log(true, `friendships/destroy/${followingUser._id}`);
-            } catch (e) {
-              Logger.log(e.message || e, `friendships/destroy/${followingUser._id}`);
-            }
+      // for (const followingUser of followingUsers) {
+      //   if (!find(topFollowingUsers, { _id: followingUser._id })) {
+      //     await new Promise(resolve => setTimeout(async () => {
+      //       try {
+      //         await this.twitter.post('friendships/destroy', { screen_name: followingUser._id });
+      //         await this.usersModel.updateOne({ _id: followingUser._id }, { $unset: { friends: true } });
+      //         Logger.log(true, `friendships/destroy/${followingUser._id}`);
+      //       } catch (e) {
+      //         Logger.log(e.message || e, `friendships/destroy/${followingUser._id}`);
+      //       }
 
-            resolve(true);
-          }, 1000 * 5));
-        }
-      }
+      //       resolve(true);
+      //     }, 1000 * 5));
+      //   }
+      // }
 
-      for (const topFollowingUser of topFollowingUsers) {
-        if (!find(followingUsers, { _id: topFollowingUser._id })) {
-          await new Promise(resolve => setTimeout(async () => {
-            try {
-              await this.twitter.post('friendships/create', { screen_name: topFollowingUser._id });
-              await this.usersModel.updateOne({ _id: topFollowingUser._id }, { $set: { friends: true } });
-              Logger.log(true, `friendships/create/${topFollowingUser._id}`);
-            } catch (e) {
-              Logger.log(e.message || e, `friendships/create/${topFollowingUser._id}`);
-            }
+      // for (const topFollowingUser of topFollowingUsers) {
+      //   if (!find(followingUsers, { _id: topFollowingUser._id })) {
+      //     await new Promise(resolve => setTimeout(async () => {
+      //       try {
+      //         await this.twitter.post('friendships/create', { screen_name: topFollowingUser._id });
+      //         await this.usersModel.updateOne({ _id: topFollowingUser._id }, { $set: { friends: true } });
+      //         Logger.log(true, `friendships/create/${topFollowingUser._id}`);
+      //       } catch (e) {
+      //         Logger.log(e.message || e, `friendships/create/${topFollowingUser._id}`);
+      //       }
 
-            resolve(true);
-          }, 1000 * 5));
-        }
-      }
+      //       resolve(true);
+      //     }, 1000 * 5));
+      //   }
+      // }
     }
 
     return { since_id: this.since_id };
