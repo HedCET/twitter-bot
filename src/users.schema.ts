@@ -6,17 +6,21 @@ export const usersSchema = new mongoose.Schema({
     required: true,
     type: String,
   },
+  blocked: {
+    default: false,
+    type: Boolean,
+  },
   favourites_count: {
     required: true,
     type: Number,
   },
-  friends: {
+  followers: {
     default: false,
     type: Boolean,
   },
-  friends_count: {
-    required: true,
-    type: Number,
+  friends: {
+    default: false,
+    type: Boolean,
   },
   time: {
     default: moment().toDate(),
