@@ -1,4 +1,4 @@
-twitter malayalam retweet bot build with NestJS, required ```.development``` file @root with following environment variables
+twitter malayalam retweet bot build with NestJS, required environment vars
 
 ```
 MONGO_URL="mongodb://user:password@x.mlab.com:port/db"
