@@ -11,7 +11,7 @@ export const usersSchema = new mongoose.Schema({
     type: Boolean,
   },
   favourites_count: {
-    required: true,
+    default: 0,
     type: Number,
   },
   followers: {
@@ -24,7 +24,6 @@ export const usersSchema = new mongoose.Schema({
   },
   time: {
     default: moment().toDate(),
-    required: true,
     type: Date,
   }
 });
