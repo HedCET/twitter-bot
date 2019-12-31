@@ -6,6 +6,7 @@ export interface search_tweets_statuses {
   created_at: string,
   id_str: string,
   user: {
+    created_at: string,
     favourites_count: number,
     screen_name: string,
   },

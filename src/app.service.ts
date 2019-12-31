@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { sortBy } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 import * as twit from 'twit';
@@ -38,13 +39,14 @@ export class AppService {
             { upsert: true });
       else break;
 
-      for (const tweet of tweets.data.statuses) {
+      for (const tweet of sortBy(tweets.data.statuses, 'id_str')) {
         const user = await this.settingsModel
           .findOne({ _id: tweet.user.screen_name });
 
         await this.usersModel
           .updateOne({ _id: tweet.user.screen_name }, {
             $set: {
+              created_at: moment(tweet.user.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate(),
               favourites: tweet.user.favourites_count,
               favourites_ref: (user ? user.favourites : tweet.user.favourites_count),
               last_tweet_time: moment(tweet.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate(),
@@ -53,7 +55,7 @@ export class AppService {
           }, { upsert: true });
       }
 
-      Logger.log(i + 1, 'AppService/update');
+      Logger.log(`${i + 1}|${tweets.data.statuses.length}`, 'AppService/update');
       await new Promise(r => setTimeout(r, 1000 * 30));
     }
 

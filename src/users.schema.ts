@@ -10,6 +10,11 @@ export const usersSchema = new Schema({
     type: Boolean,
   },
 
+  created_at: {
+    required: true,
+    type: Date,
+  },
+
   favourites: {
     required: true,
     type: Number,
