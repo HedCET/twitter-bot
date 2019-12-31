@@ -32,7 +32,8 @@ export class AppService {
           since_id: (config ? config.since_id : '0'),
         });
 
-      if (tweets.data.statuses.length)
+      if (tweets.data.statuses.length
+        && +config.since_id < +tweets.data.search_metadata.max_id_str)
         await this.settingsModel
           .updateOne({ _id: 'search/tweets' },
             { $set: { since_id: tweets.data.search_metadata.max_id_str } },
