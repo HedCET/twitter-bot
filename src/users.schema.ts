@@ -1,29 +1,30 @@
-import * as moment from 'moment';
-import * as mongoose from 'mongoose';
+import { Schema } from 'mongoose';
 
-export const usersSchema = new mongoose.Schema({
+export const usersSchema = new Schema({
   _id: {
     required: true,
     type: String,
   },
+
   blocked: {
-    default: false,
     type: Boolean,
   },
-  favourites_count: {
-    default: 0,
+
+  favourites: {
+    required: true,
     type: Number,
   },
-  followers: {
-    default: false,
-    type: Boolean,
+
+  favourites_ref: {
+    type: Number,
   },
-  friends: {
-    default: false,
-    type: Boolean,
-  },
-  time: {
-    default: moment().toDate(),
+
+  last_tweet_time: {
+    required: true,
     type: Date,
-  }
+  },
+
+  last_tweet_time_ref: {
+    type: Date,
+  },
 });
