@@ -49,15 +49,15 @@ export class AppService {
             $set: {
               created_at: moment(tweet.user.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate(),
               favourites: tweet.user.favourites_count,
-              favourites_ref: (user ? user.favourites : tweet.user.favourites_count),
-              last_tweet_time: moment(tweet.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate(),
-              last_tweet_time_ref: (user ? user.last_tweet_time : moment(tweet.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate()),
+              favourites_ref: (user ? (tweet.user.favourites_count != user.favourites ? user.favourites : user.favourites_ref) : tweet.user.favourites_count),
+              favourites_updated_at: moment(tweet.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate(),
+              favourites_ref_updated_at: (user ? (tweet.user.favourites_count != user.favourites ? user.favourites_updated_at : user.favourites_ref_updated_at) : moment(tweet.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate()),
             },
           }, { upsert: true });
       }
 
       Logger.log(`${i + 1}|${tweets.data.statuses.length}`, 'AppService/update');
-      await new Promise(r => setTimeout(r, 1000 * 30));
+      await new Promise(r => setTimeout(r, 1000 * 10));
     }
 
     return true;

@@ -6,10 +6,6 @@ export const usersSchema = new Schema({
     type: String,
   },
 
-  blocked: {
-    type: Boolean,
-  },
-
   created_at: {
     required: true,
     type: Date,
@@ -24,12 +20,12 @@ export const usersSchema = new Schema({
     type: Number,
   },
 
-  last_tweet_time: {
-    required: true,
+  favourites_ref_updated_at: {
     type: Date,
   },
 
-  last_tweet_time_ref: {
+  favourites_updated_at: {
+    required: true,
     type: Date,
   },
 });
