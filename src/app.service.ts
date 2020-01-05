@@ -19,7 +19,7 @@ export class AppService {
   ) { }
 
   async update() {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 10; i++) {
       const config = await this.settingsModel
         .findOne({ _id: 'search/tweets' });
 
