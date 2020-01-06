@@ -22,7 +22,7 @@ export class AppService {
   async update() {
     let maxId;
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 30; i++) {
       const query: search_req = {
         count: 100,
         lang: 'ml',
