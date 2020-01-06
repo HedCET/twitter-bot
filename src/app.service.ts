@@ -27,7 +27,7 @@ export class AppService {
         count: 100,
         lang: 'ml',
         q: '*',
-        result_type: (maxId ? 'mixed' : 'recent'),
+        result_type: 'recent', // (maxId ? 'mixed' : 'recent'),
       };
 
       if (maxId)
