@@ -1,16 +1,16 @@
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { env } from './env.validations';
-import { settingsSchema } from './settings.schema';
+import { tweetsSchema } from './tweets.schema';
 import { usersSchema } from './users.schema';
 
 export const modelTokens = {
-  settings: 'settings',
+  tweets: 'tweets',
   users: 'users',
 };
 
 const dbSchemas = [
-  { name: modelTokens.settings, schema: settingsSchema },
+  { name: modelTokens.tweets, schema: tweetsSchema },
   { name: modelTokens.users, schema: usersSchema }
 ];
 

@@ -1,12 +1,8 @@
 import { Schema } from 'mongoose';
 
-export const settingsSchema = new Schema({
+export const tweetsSchema = new Schema({
   _id: {
     required: true,
-    type: String,
-  },
-
-  since_id: {
     type: String,
   },
 });
