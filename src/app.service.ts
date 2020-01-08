@@ -51,24 +51,30 @@ export class AppService {
         const user = await this.usersModel
           .findOne({ _id: tweet.user.screen_name });
 
+        const $set: { [key: string]: any } = {
+          created_at: user_created_at,
+          favourites: tweet.user.favourites_count,
+          favourites_updated_at: tweet_created_at,
+        };
+
+        if (user
+          && tweet.user.favourites_count != user.favourites) {
+          $set.favourites_ref = user.favourites;
+          $set.favourites_ref_updated_at = user.favourites_updated_at;
+
+          if (!moment(tweet_created_at).isSame(user.favourites_updated_at))
+            $set.favourites_index = (tweet.user.favourites_count - user.favourites) / moment.duration(moment(tweet_created_at).diff(moment(user.favourites_updated_at))).asDays();
+        }
+
         await this.usersModel
-          .updateOne({ _id: tweet.user.screen_name }, {
-            $set: {
-              created_at: user_created_at,
-              favourites: tweet.user.favourites_count,
-              favourites_index: (user && tweet.user.favourites_count != user.favourites && !moment(tweet_created_at).isSame(user.favourites_updated_at) ? (tweet.user.favourites_count - user.favourites) / moment.duration(moment(tweet_created_at).diff(moment(user.favourites_updated_at))).asDays() : undefined),
-              favourites_ref: (user ? (tweet.user.favourites_count != user.favourites ? user.favourites : user.favourites_ref) : tweet.user.favourites_count),
-              favourites_ref_updated_at: (user ? (tweet.user.favourites_count != user.favourites ? user.favourites_updated_at : user.favourites_ref_updated_at) : tweet_created_at),
-              favourites_updated_at: tweet_created_at,
-            },
-          }, { upsert: true });
+          .updateOne({ _id: tweet.user.screen_name }, { $set }, { upsert: true });
 
         const existTweet = await this.tweetsModel
           .findOne({ _id: tweet.id_str });
 
         if (!existTweet) {
           await new this.tweetsModel({ _id: tweet.id_str }).save();
-          successTweets += 1;
+          successTweets++;
         }
       }
 
