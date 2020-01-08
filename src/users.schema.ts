@@ -6,6 +6,10 @@ export const usersSchema = new Schema({
     type: String,
   },
 
+  blocked: {
+    type: Boolean,
+  },
+
   created_at: {
     required: true,
     type: Date,
@@ -13,6 +17,10 @@ export const usersSchema = new Schema({
 
   favourites: {
     required: true,
+    type: Number,
+  },
+
+  favourites_index: {
     type: Number,
   },
 

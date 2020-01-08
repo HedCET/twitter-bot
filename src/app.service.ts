@@ -56,6 +56,7 @@ export class AppService {
             $set: {
               created_at: user_created_at,
               favourites: tweet.user.favourites_count,
+              favourites_index: (user && tweet.user.favourites_count != user.favourites && !moment(tweet_created_at).isSame(user.favourites_updated_at) ? (tweet.user.favourites_count - user.favourites) / moment.duration(moment(tweet_created_at).diff(moment(user.favourites_updated_at))).asDays() : undefined),
               favourites_ref: (user ? (tweet.user.favourites_count != user.favourites ? user.favourites : user.favourites_ref) : tweet.user.favourites_count),
               favourites_ref_updated_at: (user ? (tweet.user.favourites_count != user.favourites ? user.favourites_updated_at : user.favourites_ref_updated_at) : tweet_created_at),
               favourites_updated_at: tweet_created_at,
