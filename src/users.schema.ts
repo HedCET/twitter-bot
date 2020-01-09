@@ -20,7 +20,7 @@ export const usersSchema = new Schema({
     type: Number,
   },
 
-  favourites_index: {
+  favourites_avg: {
     type: Number,
   },
 

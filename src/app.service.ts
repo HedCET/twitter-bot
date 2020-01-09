@@ -63,7 +63,7 @@ export class AppService {
           $set.favourites_ref_updated_at = user.favourites_updated_at;
 
           if (!moment(tweet_created_at).isSame(user.favourites_updated_at))
-            $set.favourites_index = (tweet.user.favourites_count - user.favourites) / moment.duration(moment(tweet_created_at).diff(moment(user.favourites_updated_at))).asDays();
+            $set.favourites_avg = (tweet.user.favourites_count - user.favourites) / moment.duration(moment(tweet_created_at).diff(moment(user.favourites_updated_at))).asDays();
         }
 
         await this.usersModel
