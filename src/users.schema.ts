@@ -15,6 +15,10 @@ export const usersSchema = new Schema({
     type: Date,
   },
 
+  earlier_tweeted_at: {
+    type: Date,
+  },
+
   favourites: {
     required: true,
     type: Number,
@@ -24,15 +28,7 @@ export const usersSchema = new Schema({
     type: Number,
   },
 
-  favourites_ref: {
-    type: Number,
-  },
-
-  favourites_ref_updated_at: {
-    type: Date,
-  },
-
-  favourites_updated_at: {
+  tweeted_at: {
     required: true,
     type: Date,
   },

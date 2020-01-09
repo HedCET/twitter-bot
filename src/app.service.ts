@@ -45,25 +45,24 @@ export class AppService {
       let successTweets = 0;
 
       for (const tweet of statuses) {
-        const tweet_created_at = moment(tweet.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate();
-        const user_created_at = moment(tweet.user.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate();
+        const created_at = moment(tweet.user.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate();
+        const tweeted_at = moment(tweet.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate();
 
         const user = await this.usersModel
           .findOne({ _id: tweet.user.screen_name });
 
         const $set: { [key: string]: any } = {
-          created_at: user_created_at,
+          created_at,
           favourites: tweet.user.favourites_count,
-          favourites_updated_at: tweet_created_at,
+          tweeted_at,
         };
 
         if (user
-          && tweet.user.favourites_count != user.favourites) {
-          $set.favourites_ref = user.favourites;
-          $set.favourites_ref_updated_at = user.favourites_updated_at;
+          && !moment(tweeted_at).isSame(user.tweeted_at)) {
+          $set.earlier_tweeted_at = user.tweeted_at;
 
-          if (!moment(tweet_created_at).isSame(user.favourites_updated_at))
-            $set.favourites_avg = (tweet.user.favourites_count - user.favourites) / moment.duration(moment(tweet_created_at).diff(moment(user.favourites_updated_at))).asDays();
+          if (tweet.user.favourites_count != user.favourites)
+            $set.favourites_avg = (tweet.user.favourites_count - user.favourites) / moment.duration(moment(tweeted_at).diff(moment(user.tweeted_at))).asDays();
         }
 
         await this.usersModel
