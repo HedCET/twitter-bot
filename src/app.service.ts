@@ -84,6 +84,16 @@ export class AppService {
       await new Promise(r => setTimeout(r, 1000 * 10));
     }
 
+    const thresholdTweet = await this.tweetsModel
+      .where()
+      .sort({ _id: 'desc' })
+      .skip(60000)
+      .findOne();
+
+    if (thresholdTweet)
+      await this.tweetsModel
+        .deleteMany({ _id: { $lte: thresholdTweet._id } });
+
     return true;
   }
 }
