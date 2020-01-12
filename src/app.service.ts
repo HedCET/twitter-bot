@@ -39,7 +39,7 @@ export class AppService {
       if (!tweets.data.statuses.length)
         break;
 
-      const statuses = sortBy(tweets.data.statuses, [item => `${moment(item.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).format('X')}.${item.id_str}`]);
+      const statuses = sortBy(tweets.data.statuses, [item => `${moment(item.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).format('x')}.${item.id_str}`]);
       maxId = BigInt(statuses[0].id_str).subtract(1).toString();
 
       let successTweets = 0;
