@@ -59,10 +59,10 @@ export class AppService {
 
         if (user
           && !moment(tweeted_at).isSame(user.tweeted_at)) {
-          $set.earlier_tweeted_at = user.tweeted_at;
+          $set.recent_tweeted_at_frequency = moment.duration(moment(tweeted_at).diff(moment(user.tweeted_at))).asDays();
 
           if (tweet.user.favourites_count != user.favourites)
-            $set.favourites_avg = (tweet.user.favourites_count - user.favourites) / moment.duration(moment(tweeted_at).diff(moment(user.tweeted_at))).asDays();
+            $set.recent_favourites_average = (tweet.user.favourites_count - user.favourites) / $set.recent_tweeted_at_frequency;
         }
 
         await this.usersModel
