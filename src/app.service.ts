@@ -39,7 +39,7 @@ export class AppService {
       if (!tweets.data.statuses.length)
         break;
 
-      const statuses = sortBy(tweets.data.statuses, 'id_str');
+      const statuses = sortBy(tweets.data.statuses, ['id_str', 'created_at']);
       maxId = BigInt(statuses[0].id_str).subtract(1).toString();
 
       let successTweets = 0;
@@ -58,7 +58,7 @@ export class AppService {
         };
 
         if (user
-          && !moment(tweeted_at).isSame(user.tweeted_at)) {
+          && moment(tweeted_at).isAfter(user.tweeted_at)) {
           $set.recent_tweeted_at_frequency = moment.duration(moment(tweeted_at).diff(moment(user.tweeted_at))).asDays();
 
           if (tweet.user.favourites_count != user.favourites)
@@ -87,7 +87,7 @@ export class AppService {
     const thresholdTweet = await this.tweetsModel
       .where()
       .sort({ _id: 'desc' })
-      .skip(60000)
+      .skip(100000)
       .findOne();
 
     if (thresholdTweet)
