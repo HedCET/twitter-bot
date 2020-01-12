@@ -27,7 +27,7 @@ export class AppService {
         count: 100,
         lang: 'ml',
         q: '*',
-        result_type: 'recent', // (maxId ? 'mixed' : 'recent'),
+        result_type: 'recent',
       };
 
       if (maxId)
@@ -87,7 +87,7 @@ export class AppService {
     const thresholdTweet = await this.tweetsModel
       .where()
       .sort({ _id: 'desc' })
-      .skip(100000)
+      .skip(1000)
       .findOne();
 
     if (thresholdTweet)
