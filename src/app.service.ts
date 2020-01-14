@@ -48,25 +48,34 @@ export class AppService {
         const created_at = moment(tweet.user.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate();
         const tweeted_at = moment(tweet.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).toDate();
 
+        const $set: { [key: string]: any } = { created_at, tweeted_at };
+        const $unset: { [key: string]: any } = {};
+
+        if (tweet.user.favourites_count) $set.favourites = tweet.user.favourites_count; else $unset.favourites = true;
+        if (tweet.user.followers_count) $set.followers = tweet.user.followers_count; else $unset.followers = true;
+        if (tweet.user.friends_count) $set.friends = tweet.user.friends_count; else $unset.friends = true;
+
         const user = await this.usersModel
           .findOne({ _id: tweet.user.screen_name });
 
-        const $set: { [key: string]: any } = {
-          created_at,
-          favourites: tweet.user.favourites_count,
-          tweeted_at,
-        };
-
         if (user
           && moment(tweeted_at).isAfter(user.tweeted_at)) {
-          $set.recent_tweeted_at_frequency = moment.duration(moment(tweeted_at).diff(moment(user.tweeted_at))).asDays();
+          $set.last_tweeted_at_frequency = moment.duration(moment(tweeted_at).diff(moment(user.tweeted_at))).asDays();
 
-          if (tweet.user.favourites_count != user.favourites)
-            $set.recent_favourites_average = (tweet.user.favourites_count - user.favourites) / $set.recent_tweeted_at_frequency;
+          if (tweet.user.favourites_count != user.favourites && (tweet.user.favourites_count || 0) - (user.favourites || 0)) $set.last_favourites_average = ((tweet.user.favourites_count || 0) - (user.favourites || 0)) / $set.last_tweeted_at_frequency;
+          if (tweet.user.followers_count != user.followers && (tweet.user.followers_count || 0) - (user.followers || 0)) $set.last_followers_average = ((tweet.user.followers_count || 0) - (user.followers || 0)) / $set.last_tweeted_at_frequency;
+          if (tweet.user.friends_count != user.friends && (tweet.user.friends_count || 0) - (user.friends || 0)) $set.last_friends_average = ((tweet.user.friends_count || 0) - (user.friends || 0)) / $set.last_tweeted_at_frequency;
         }
 
+        if (tweet.user.profile_image_url) {
+          const match = tweet.user.profile_image_url.match(/_images\/(.*)_normal/i);
+
+          if (match) $set.profile_image_path = match[1];
+          else Logger.log(tweet.user.profile_image_url, 'AppService/update/profile_image_url');
+        } else $unset.profile_image_path = true;
+
         await this.usersModel
-          .updateOne({ _id: tweet.user.screen_name }, { $set }, { upsert: true });
+          .updateOne({ _id: tweet.user.screen_name }, { $set, $unset }, { upsert: true });
 
         const existTweet = await this.tweetsModel
           .findOne({ _id: tweet.id_str });

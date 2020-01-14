@@ -4,6 +4,9 @@ export interface search_res_statuses {
   user: {
     created_at: string,
     favourites_count: number,
+    followers_count: number,
+    friends_count: number,
+    profile_image_url: string,
     screen_name: string,
   },
 }
