@@ -62,9 +62,9 @@ export class AppService {
           && moment(tweeted_at).isAfter(user.tweeted_at)) {
           $set.last_tweeted_at_frequency = moment.duration(moment(tweeted_at).diff(moment(user.tweeted_at))).asDays();
 
-          if (tweet.user.favourites_count != user.favourites && (tweet.user.favourites_count || 0) - (user.favourites || 0)) $set.last_favourites_average = ((tweet.user.favourites_count || 0) - (user.favourites || 0)) / $set.last_tweeted_at_frequency;
-          if (tweet.user.followers_count != user.followers && (tweet.user.followers_count || 0) - (user.followers || 0)) $set.last_followers_average = ((tweet.user.followers_count || 0) - (user.followers || 0)) / $set.last_tweeted_at_frequency;
-          if (tweet.user.friends_count != user.friends && (tweet.user.friends_count || 0) - (user.friends || 0)) $set.last_friends_average = ((tweet.user.friends_count || 0) - (user.friends || 0)) / $set.last_tweeted_at_frequency;
+          if (user.favourites && tweet.user.favourites_count != user.favourites && tweet.user.favourites_count - user.favourites) $set.last_favourites_average = (tweet.user.favourites_count - user.favourites) / $set.last_tweeted_at_frequency;
+          if (user.followers && tweet.user.followers_count != user.followers && tweet.user.followers_count - user.followers) $set.last_followers_average = (tweet.user.followers_count - user.followers) / $set.last_tweeted_at_frequency;
+          if (user.friends && tweet.user.friends_count != user.friends && tweet.user.friends_count - user.friends) $set.last_friends_average = (tweet.user.friends_count - user.friends) / $set.last_tweeted_at_frequency;
         }
 
         if (tweet.user.profile_image_url) {
