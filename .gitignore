@@ -7,7 +7,7 @@ npm-debug.log*
 package-lock.json
 /node_modules
 
-# Logs
+# logs
 *.log
 lerna-debug.log*
 /logs
@@ -15,7 +15,7 @@ lerna-debug.log*
 # OS
 .DS_Store
 
-# Tests
+# tests
 /coverage
 /.nyc_output
 
