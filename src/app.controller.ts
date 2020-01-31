@@ -7,7 +7,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
-  index() {
+  get() {
     return { status: 200 };
   }
 

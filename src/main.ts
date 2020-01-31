@@ -27,12 +27,12 @@ const bootstrap = async () => {
     }),
   );
   app.use(cookieParser());
-  // app.use(csurf());
-  app.use((req, res, next) => {
-    const _csurf = csurf({ cookie: true });
-    if (-1 < ['/update'].indexOf(req.url)) return next();
-    _csurf(req, res, next);
-  });
+  app.use(csurf({ cookie: true }));
+  // app.use((req, res, next) => {
+  //   const _csurf = csurf({ cookie: true });
+  //   if (-1 < ['/update'].indexOf(req.url)) return next();
+  //   _csurf(req, res, next);
+  // });
   app.use(
     expressRateLimit({
       max: 60 * 60,
