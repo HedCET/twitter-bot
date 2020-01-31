@@ -11,5 +11,4 @@ import { twitterProviders } from './twitter.providers';
   imports: [...dbImports],
   providers: [...twitterProviders, AppService],
 })
-
-export class AppModule { }
+export class AppModule {}

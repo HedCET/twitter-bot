@@ -1,5 +1,5 @@
 import { Document } from 'mongoose';
 
 export interface tweetsInterface extends Document {
-  _id: String,
+  _id: String;
 }

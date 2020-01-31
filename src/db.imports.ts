@@ -11,7 +11,7 @@ export const modelTokens = {
 
 const dbSchemas = [
   { name: modelTokens.tweets, schema: tweetsSchema },
-  { name: modelTokens.users, schema: usersSchema }
+  { name: modelTokens.users, schema: usersSchema },
 ];
 
 export const dbImports = [
@@ -19,5 +19,5 @@ export const dbImports = [
   MongooseModule.forRoot(env.MONGO_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
-  })
+  }),
 ];
