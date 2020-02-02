@@ -105,19 +105,6 @@ export class AppService {
               $set.last_tweeted_at_frequency;
         }
 
-        if (tweet.user.profile_image_url) {
-          const match = tweet.user.profile_image_url.match(
-            /_images\/(.*)_normal/i,
-          );
-
-          if (match) $set.profile_image_path = match[1];
-          else
-            Logger.log(
-              tweet.user.profile_image_url,
-              'AppService/update/profile_image_url',
-            );
-        } else $unset.profile_image_path = true;
-
         await this.usersModel.updateOne(
           { _id: tweet.user.screen_name },
           { $set, $unset },

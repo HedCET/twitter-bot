@@ -11,6 +11,5 @@ export interface usersInterface extends Document {
   last_followers_average?: Number;
   last_friends_average?: Number;
   last_tweeted_at_frequency?: Number;
-  profile_image_path?: String;
   tweeted_at: Date;
 }

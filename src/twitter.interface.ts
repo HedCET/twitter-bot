@@ -6,7 +6,6 @@ export interface search_res_statuses {
     favourites_count: number,
     followers_count: number,
     friends_count: number,
-    profile_image_url: string,
     screen_name: string,
   },
 }
