@@ -9,7 +9,6 @@ const schema = {
     .string()
     .valid(['development', 'production'])
     .default('development'),
-  MONGO_URL: joi.string().required(),
   PORT: joi.number().default(8080),
   ROOT_URL: joi.string().default('localhost:8080'),
   SECRET: joi.string().default('secret'),

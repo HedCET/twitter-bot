@@ -1,25 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
 import * as BigInt from 'big-integer';
 import { sortBy } from 'lodash';
 import * as moment from 'moment';
-import { Model } from 'mongoose';
 import * as twit from 'twit';
 
-import { modelTokens } from './db.imports';
-import { tweetsInterface } from './tweets.interface';
+import { db } from './firebase';
 import { search_req, search_res } from './twitter.interface';
-import { usersInterface } from './users.interface';
+import { userInterface } from './user.interface';
 
 @Injectable()
 export class AppService {
-  constructor(
-    @Inject('TWITTER') private readonly twitter: typeof twit,
-    @InjectModel(modelTokens.tweets)
-    private readonly tweetsModel: Model<tweetsInterface>,
-    @InjectModel(modelTokens.users)
-    private readonly usersModel: Model<usersInterface>,
-  ) {}
+  constructor(@Inject('TWITTER') private readonly twitter: typeof twit) {}
 
   async update() {
     let maxId;
@@ -40,9 +31,9 @@ export class AppService {
 
       const statuses = sortBy(tweets.data.statuses, [
         item =>
-          `${moment(item.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).format(
-            'x',
-          )}.${item.id_str}`,
+          `${moment(item.created_at, [
+            'ddd MMM D HH:mm:ss ZZ YYYY',
+          ]).format()}.${item.id_str}`,
       ]);
       maxId = BigInt(statuses[0].id_str)
         .subtract(1)
@@ -53,70 +44,57 @@ export class AppService {
       for (const tweet of statuses) {
         const created_at = moment(tweet.user.created_at, [
           'ddd MMM D HH:mm:ss ZZ YYYY',
-        ]).toDate();
+        ]).format();
         const tweeted_at = moment(tweet.created_at, [
           'ddd MMM D HH:mm:ss ZZ YYYY',
-        ]).toDate();
+        ]).format();
 
-        const $set: { [key: string]: any } = { created_at, tweeted_at };
-        const $unset: { [key: string]: any } = {};
+        const user: userInterface = { created_at, tweeted_at };
 
         if (tweet.user.favourites_count)
-          $set.favourites = tweet.user.favourites_count;
-        else $unset.favourites = true;
+          user.favourites = tweet.user.favourites_count;
         if (tweet.user.followers_count)
-          $set.followers = tweet.user.followers_count;
-        else $unset.followers = true;
-        if (tweet.user.friends_count) $set.friends = tweet.user.friends_count;
-        else $unset.friends = true;
+          user.followers = tweet.user.followers_count;
+        if (tweet.user.friends_count) user.friends = tweet.user.friends_count;
 
-        const user = await this.usersModel.findOne({
-          _id: tweet.user.screen_name,
-        });
+        const userRef = db.ref(`users/${tweet.user.screen_name}`);
+        const userRefVal = (await userRef.once('value')).val();
 
-        if (user && moment(tweeted_at).isAfter(user.tweeted_at)) {
-          $set.last_tweeted_at_frequency = moment
-            .duration(moment(tweeted_at).diff(moment(user.tweeted_at)))
+        if (userRefVal && moment(tweeted_at).isAfter(userRefVal.tweeted_at)) {
+          user.last_tweeted_at_frequency = moment
+            .duration(moment(tweeted_at).diff(moment(userRefVal.tweeted_at)))
             .asDays();
 
           if (
-            user.favourites &&
-            tweet.user.favourites_count != user.favourites &&
-            tweet.user.favourites_count - user.favourites
+            userRefVal.favourites &&
+            tweet.user.favourites_count != userRefVal.favourites
           )
-            $set.last_favourites_average =
-              (tweet.user.favourites_count - user.favourites) /
-              $set.last_tweeted_at_frequency;
+            user.last_favourites_average =
+              (tweet.user.favourites_count - userRefVal.favourites) /
+              user.last_tweeted_at_frequency;
           if (
-            user.followers &&
-            tweet.user.followers_count != user.followers &&
-            tweet.user.followers_count - user.followers
+            userRefVal.followers &&
+            tweet.user.followers_count != userRefVal.followers
           )
-            $set.last_followers_average =
-              (tweet.user.followers_count - user.followers) /
-              $set.last_tweeted_at_frequency;
+            user.last_followers_average =
+              (tweet.user.followers_count - userRefVal.followers) /
+              user.last_tweeted_at_frequency;
           if (
-            user.friends &&
-            tweet.user.friends_count != user.friends &&
-            tweet.user.friends_count - user.friends
+            userRefVal.friends &&
+            tweet.user.friends_count != userRefVal.friends
           )
-            $set.last_friends_average =
-              (tweet.user.friends_count - user.friends) /
-              $set.last_tweeted_at_frequency;
-        }
+            user.last_friends_average =
+              (tweet.user.friends_count - userRefVal.friends) /
+              user.last_tweeted_at_frequency;
 
-        await this.usersModel.updateOne(
-          { _id: tweet.user.screen_name },
-          { $set, $unset },
-          { upsert: true },
-        );
+          userRef.update(user);
+        } else userRef.set(user);
 
-        const existTweet = await this.tweetsModel.findOne({
-          _id: tweet.id_str,
-        });
+        const tweetRef = db.ref(`tweets/${tweet.id_str}`);
+        const tweetRefVal = (await tweetRef.once('value')).val();
 
-        if (!existTweet) {
-          await new this.tweetsModel({ _id: tweet.id_str }).save();
+        if (!tweetRefVal) {
+          tweetRef.set(tweeted_at);
           successTweets++;
         }
       }
@@ -130,14 +108,24 @@ export class AppService {
       await new Promise(r => setTimeout(r, 1000 * 10));
     }
 
-    const thresholdTweet = await this.tweetsModel
-      .where()
-      .sort({ _id: 'desc' })
-      .skip(1000)
-      .findOne();
+    const tweetsThresholdRef = db.ref('tweets');
+    const tweetsThresholdRefVal = (
+      await tweetsThresholdRef
+        .orderByKey()
+        .limitToLast(1000)
+        .once('value')
+    ).val();
 
-    if (thresholdTweet)
-      await this.tweetsModel.deleteMany({ _id: { $lte: thresholdTweet._id } });
+    const endAt = Object.keys(tweetsThresholdRefVal)[0];
+
+    (
+      await tweetsThresholdRef
+        .orderByKey()
+        .endAt(endAt)
+        .once('value')
+    ).forEach(item => {
+      if (item.key != endAt) tweetsThresholdRef.child(item.key).remove();
+    });
 
     return true;
   }
