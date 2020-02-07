@@ -31,9 +31,9 @@ export class AppService {
 
       const statuses = sortBy(tweets.data.statuses, [
         item =>
-          `${moment(item.created_at, [
-            'ddd MMM D HH:mm:ss ZZ YYYY',
-          ]).format()}.${item.id_str}`,
+          `${moment(item.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).format(
+            'x',
+          )}.${item.id_str}`,
       ]);
       maxId = BigInt(statuses[0].id_str)
         .subtract(1)
@@ -42,12 +42,12 @@ export class AppService {
       let successTweets = 0;
 
       for (const tweet of statuses) {
-        const created_at = moment(tweet.user.created_at, [
+        const created_at = +moment(tweet.user.created_at, [
           'ddd MMM D HH:mm:ss ZZ YYYY',
-        ]).format();
-        const tweeted_at = moment(tweet.created_at, [
+        ]).format('x');
+        const tweeted_at = +moment(tweet.created_at, [
           'ddd MMM D HH:mm:ss ZZ YYYY',
-        ]).format();
+        ]).format('x');
 
         const user: userInterface = { created_at, tweeted_at };
 
@@ -62,7 +62,7 @@ export class AppService {
 
         if (userRefVal && moment(tweeted_at).isAfter(userRefVal.tweeted_at)) {
           user.last_tweeted_at_frequency = moment
-            .duration(moment(tweeted_at).diff(moment(userRefVal.tweeted_at)))
+            .duration(moment(tweeted_at).diff(userRefVal.tweeted_at))
             .asDays();
 
           if (

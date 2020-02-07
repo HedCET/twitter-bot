@@ -1,6 +1,6 @@
 export interface userInterface {
   blocked?: boolean;
-  created_at: string;
+  created_at: number;
   favourites?: number;
   followers?: number;
   friends?: number;
@@ -8,5 +8,5 @@ export interface userInterface {
   last_followers_average?: number;
   last_friends_average?: number;
   last_tweeted_at_frequency?: number;
-  tweeted_at: string;
+  tweeted_at: number;
 }

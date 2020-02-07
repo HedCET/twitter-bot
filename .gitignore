@@ -1,5 +1,6 @@
 # random
 .development
+firebase.rules.json
 serviceAccount.json
 /dist
 
