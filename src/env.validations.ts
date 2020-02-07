@@ -9,6 +9,9 @@ const schema = {
     .string()
     .valid(['development', 'production'])
     .default('development'),
+  FIREBASE_CLIENT_EMAIL: joi.string().required(),
+  FIREBASE_PRIVATE_KEY: joi.string().required(),
+  FIREBASE_PROJECT_ID: joi.string().required(),
   PORT: joi.number().default(8080),
   ROOT_URL: joi.string().default('localhost:8080'),
   SECRET: joi.string().default('secret'),
