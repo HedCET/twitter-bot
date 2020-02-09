@@ -15,4 +15,9 @@ export class AppController {
   async wordart(@Query('key') key: string = '') {
     return this.appService.wordart(key);
   }
+
+  @Get('search')
+  async search(@Query('key') key: string = '') {
+    return this.appService.search(key);
+  }
 }

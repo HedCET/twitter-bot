@@ -244,4 +244,21 @@ export class AppService {
       return res;
     }
   }
+
+  async search(key: string = '') {
+    const userRef = db.ref('users');
+
+    return (key
+      ? await userRef
+          .orderByKey()
+          .startAt(key)
+          .endAt(`${key}\uf8ff`)
+          .limitToLast(10)
+          .once('value')
+      : await userRef
+          .orderByChild('tweeted_at')
+          .limitToLast(10)
+          .once('value')
+    ).val();
+  }
 }
