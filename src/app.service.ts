@@ -173,20 +173,14 @@ export class AppService {
             .startAt(data.startAt)
             .once('value')
         ).forEach(user => {
-          if (
-            0 <
-              user.val()[
-                `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
-              ] &&
-            !find(data.tweeters, { key: user.key })
-          ) {
+          const value = user.val()[
+            `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
+          ];
+
+          if (0 < value && !find(data.tweeters, { key: user.key })) {
             data.tweeters.push({
               key: user.key,
-              value: Math.ceil(
-                user.val()[
-                  `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
-                ],
-              ),
+              value: Math.ceil(value),
             });
           }
         });
