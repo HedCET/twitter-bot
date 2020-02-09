@@ -20,7 +20,7 @@ export class AppService {
     @Inject('TWITTER') private readonly twitter: typeof twit,
   ) {}
 
-  @Cron('0 0,10,20,30,40,50 2-20 * * *')
+  @Cron('0 0,10,20,30,40,50 * * * *')
   async update() {
     let maxId;
 
@@ -142,7 +142,7 @@ export class AppService {
     return true;
   }
 
-  @Cron('0 5,15,25,35,45,55 2-20 * * *')
+  @Cron('30 2,12,22,32,42,52 * * * *')
   async _wordart(key: string = '') {
     if (key) {
       let startAt: number;
