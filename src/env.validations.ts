@@ -5,6 +5,8 @@ import { keys, pick } from 'lodash';
 import * as path from 'path';
 
 const schema = {
+  AMQP_QUEUE: joi.string().required(),
+  AMQP_URL: joi.string().required(),
   ENV: joi
     .string()
     .valid(['development', 'production'])
@@ -19,6 +21,7 @@ const schema = {
   TWITTER_ACCESS_TOKEN_SECRET: joi.string().required(),
   TWITTER_CONSUMER_KEY: joi.string().required(),
   TWITTER_CONSUMER_SECRET: joi.string().required(),
+  WORDART_IMAGE_URLS: joi.string().required(),
 };
 
 const { error, value } = joi.validate(

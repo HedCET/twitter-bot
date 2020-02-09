@@ -1,4 +1,4 @@
-import { Controller, Get, Logger } from '@nestjs/common';
+import { Controller, Get, Logger, Query } from '@nestjs/common';
 
 import { AppService } from './app.service';
 
@@ -13,9 +13,11 @@ export class AppController {
 
   @Get('update')
   async update() {
-    setTimeout(async () =>
-      Logger.log(await this.appService.update(), 'AppController/update'),
-    );
-    return true;
+    return await this.appService.update();
+  }
+
+  @Get('wordart')
+  async wordart(@Query('key') key: string = '') {
+    return this.appService.wordart(key);
   }
 }

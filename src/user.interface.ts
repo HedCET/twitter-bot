@@ -1,3 +1,5 @@
+import { db } from 'dist/firebase';
+
 export interface userInterface {
   blocked?: boolean;
   created_at: number;

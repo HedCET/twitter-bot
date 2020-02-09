@@ -1,17 +1,26 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { sortBy } from 'lodash';
+import { each, find, pick, sample, sortBy } from 'lodash';
 import * as moment from 'moment';
 import * as twit from 'twit';
 
+import { AmqpService } from './amqp.service';
+import { env } from './env.validations';
 import { db } from './firebase';
 import { search_req, search_res } from './twitter.interface';
 import { userInterface } from './user.interface';
 
 @Injectable()
 export class AppService {
-  constructor(@Inject('TWITTER') private readonly twitter: typeof twit) {}
+  private cache: { [key: string]: any };
 
+  constructor(
+    private readonly amqpService: AmqpService,
+    @Inject('TWITTER') private readonly twitter: typeof twit,
+  ) {}
+
+  @Cron('0 0,10,20,30,40,50 2-20 * * *')
   async update() {
     let maxId;
 
@@ -88,7 +97,10 @@ export class AppService {
               user.last_tweeted_at_frequency;
 
           userRef.update(user);
-        } else userRef.set(user);
+        } else {
+          // Logger.log({ [tweet.user.screen_name]: user }, 'AppService/update');
+          userRef.set(user);
+        }
 
         const tweetRef = db.ref(`tweets/${tweet.id_str}`);
         const tweetRefVal = (await tweetRef.once('value')).val();
@@ -128,5 +140,114 @@ export class AppService {
     });
 
     return true;
+  }
+
+  @Cron('0 5,15,25,35,45,55 2-20 * * *')
+  async _wordart(key: string = '') {
+    if (key) {
+      let startAt: number;
+      const usersRef = db.ref('users');
+
+      (
+        await usersRef
+          .orderByChild('tweeted_at')
+          .limitToLast(1)
+          .once('value')
+      ).forEach(user => {
+        startAt = +moment(user.val().tweeted_at)
+          .subtract(10, 'minutes')
+          .format('x');
+      });
+
+      const data = { startAt, tweeters: [], wordArt: {} };
+
+      for (let i = 0; data.tweeters.length < 10 && i < 10; i++) {
+        if (i)
+          data.startAt = +moment(data.startAt)
+            .subtract(i * 10, 'minutes')
+            .format('x');
+
+        (
+          await usersRef
+            .orderByChild('tweeted_at')
+            .startAt(data.startAt)
+            .once('value')
+        ).forEach(user => {
+          if (
+            0 <
+              user.val()[
+                `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
+              ] &&
+            !find(data.tweeters, { key: user.key })
+          ) {
+            data.tweeters.push({
+              key: user.key,
+              value: Math.ceil(
+                user.val()[
+                  `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
+                ],
+              ),
+            });
+          }
+        });
+      }
+
+      try {
+        if (data.tweeters.length) {
+          const rpc = await this.amqpService.request(
+            {},
+            {
+              sendOpts: {
+                headers: {
+                  image: env.WORDART_IMAGE_URLS
+                    ? sample(env.WORDART_IMAGE_URLS.split('|'))
+                    : '',
+                  words: data.tweeters
+                    .map(item => `${item.key};${item.value}`)
+                    .join('\n'),
+                },
+              },
+            },
+          );
+
+          data.wordArt = JSON.parse(rpc.content.toString());
+
+          if (this.cache) this.cache[key] = data;
+          else this.cache = { [key]: data };
+        }
+      } catch (e) {
+        Logger.log(e.message, `AppService/${key}`);
+      }
+    } else {
+      await this._wordart('favourites');
+      await this._wordart('followers');
+      await this._wordart('friends');
+      await this._wordart('tweeted_at');
+    }
+
+    return this.cache;
+  }
+
+  async wordart(key: string = '') {
+    if (!this.cache) await this._wordart();
+
+    if (key && this.cache[key]) return this.cache[key].wordArt;
+    else {
+      const res = pick(this.cache, [
+        'favourites',
+        'followers',
+        'friends',
+        'tweeted_at',
+      ]);
+
+      each(res, (v, k) => {
+        res[k] = {
+          startAt: v.startAt,
+          tweeters: v.tweeters.length,
+        };
+      });
+
+      return res;
+    }
   }
 }
