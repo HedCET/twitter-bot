@@ -227,19 +227,19 @@ export class AppService {
 
     if (key && this.cache[key]) return this.cache[key].wordArt;
     else {
-      const res = pick(this.cache, [
-        'favourites',
-        'followers',
-        'friends',
-        'tweeted_at',
-      ]);
+      const json = {};
 
-      each(res, v => {
-        v.tweeters = v.tweeters.map(tweeter => tweeter.key);
-        delete v.wordArt;
-      });
+      each(
+        pick(this.cache, ['favourites', 'followers', 'friends', 'tweeted_at']),
+        (value, key) => {
+          json[key] = {
+            startAt: value.startAt,
+            tweeters: value.tweeters.map(tweeter => tweeter.key),
+          };
+        },
+      );
 
-      return res;
+      return json;
     }
   }
 
