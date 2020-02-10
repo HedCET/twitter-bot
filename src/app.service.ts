@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { each, find, pick, sample, sortBy } from 'lodash';
+import { each, find, pick, sample, sortBy, takeRight } from 'lodash';
 import * as moment from 'moment';
 import * as twit from 'twit';
 
@@ -233,8 +233,8 @@ export class AppService {
         pick(this.cache, ['favourites', 'followers', 'friends', 'tweeted_at']),
         (value, key) => {
           json[key] = {
+            hits: value.tweeters.map(tweeter => tweeter.key),
             startAt: value.startAt,
-            tweeters: value.tweeters.map(tweeter => tweeter.key),
           };
         },
       );
@@ -244,19 +244,24 @@ export class AppService {
   }
 
   async search(key: string = '') {
+    const hits = [];
     const userRef = db.ref('users');
 
-    return (key
+    (key
       ? await userRef
           .orderByKey()
           .startAt(key)
           .endAt(`${key}\uf8ff`)
-          .limitToLast(10)
           .once('value')
-      : await userRef
-          .orderByChild('tweeted_at')
-          .limitToLast(10)
-          .once('value')
-    ).val();
+      : await userRef.orderByChild('tweeted_at').once('value')
+    ).forEach(snapshot => {
+      // if (!find(hits, { _id: snapshot.key }))
+      hits.push({ ...snapshot.val(), _id: snapshot.key });
+    });
+
+    return {
+      hits: takeRight(sortBy(hits, ['tweeted_at']), 10),
+      total: hits.length,
+    };
   }
 }
