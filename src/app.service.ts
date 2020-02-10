@@ -234,11 +234,9 @@ export class AppService {
         'tweeted_at',
       ]);
 
-      each(res, (v, k) => {
-        res[k] = {
-          startAt: v.startAt,
-          tweeters: v.tweeters.length,
-        };
+      each(res, v => {
+        v.tweeters = v.tweeters.map(tweeter => tweeter.key);
+        delete v.wordArt;
       });
 
       return res;
