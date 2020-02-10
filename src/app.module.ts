@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { CacheModule, Global, Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 
 import { amqpProviders } from './amqp.providers';
@@ -10,7 +10,7 @@ import { twitterProviders } from './twitter.providers';
 @Global()
 @Module({
   controllers: [AppController],
-  imports: [ScheduleModule.forRoot()],
+  imports: [CacheModule.register({ ttl: 600 }), ScheduleModule.forRoot()],
   providers: [...amqpProviders, ...twitterProviders, AmqpService, AppService],
 })
 export class AppModule {}

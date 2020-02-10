@@ -1,4 +1,10 @@
-import { Controller, Get, Logger, Query } from '@nestjs/common';
+import {
+  CacheInterceptor,
+  Controller,
+  Get,
+  Query,
+  UseInterceptors,
+} from '@nestjs/common';
 
 import { AppService } from './app.service';
 
@@ -17,6 +23,7 @@ export class AppController {
   }
 
   @Get('search')
+  @UseInterceptors(CacheInterceptor)
   async search(@Query('key') key: string = '') {
     return this.appService.search(key);
   }
