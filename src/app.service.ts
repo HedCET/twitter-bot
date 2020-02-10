@@ -258,7 +258,7 @@ export class AppService {
     });
 
     return {
-      hits: takeRight(sortBy(hits, ['tweeted_at']), 10),
+      hits: takeRight(sortBy(hits, ['tweeted_at']), 10).reverse(),
       total: hits.length,
     };
   }
