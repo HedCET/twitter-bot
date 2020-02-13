@@ -8,7 +8,7 @@ firebase.initializeApp({
     privateKey: env['FIREBASE_PRIVATE_KEY'].replace(/\\n/g, '\n'),
     projectId: env['FIREBASE_PROJECT_ID'],
   }),
-  databaseURL: 'https://linto-1.firebaseio.com',
+  databaseURL: 'https://kandamkori.firebaseio.com',
 });
 
 export const db = firebase.database();
