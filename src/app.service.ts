@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { each, pick, sample, sortBy, takeRight } from 'lodash';
+import { compact, each, pick, sample, sortBy, takeRight } from 'lodash';
 import * as moment from 'moment';
 import * as twit from 'twit';
 
@@ -30,6 +30,7 @@ export class AppService {
         lang: 'ml',
         q: '*',
         result_type: 'recent',
+        tweet_mode: 'extended',
       };
 
       if (maxId) query.max_id = maxId;
@@ -101,6 +102,15 @@ export class AppService {
           // Logger.log({ [tweet.user.screen_name]: user }, 'AppService/update');
           userRef.set(user);
         }
+
+        const words = tweet.full_text
+          .replace(/[^\u0d00-\u0d7f ]+/g, '')
+          .trim()
+          .split(/ +/);
+
+        for (const word of words)
+          if (word)
+            await db.ref(`words/${word}`).transaction(v => (v || 0) + 1);
 
         const tweetRef = db.ref(`tweets/${tweet.id_str}`);
         const tweetRefVal = (await tweetRef.once('value')).val();
