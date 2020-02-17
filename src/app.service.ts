@@ -103,14 +103,14 @@ export class AppService {
           userRef.set(user);
         }
 
-        const words = tweet.full_text
-          .replace(/[^\u0d00-\u0d7f ]+/g, '')
-          .trim()
-          .split(/ +/);
+        // const words = tweet.full_text
+        //   .replace(/[^\u0d00-\u0d7f ]+/g, '')
+        //   .trim()
+        //   .split(/ +/);
 
-        for (const word of words)
-          if (word)
-            await db.ref(`words/${word}`).transaction(v => (v || 0) + 1);
+        // for (const word of words)
+        //   if (word)
+        //     await db.ref(`words/${word}`).transaction(v => (v || 0) + 1);
 
         const tweetRef = db.ref(`tweets/${tweet.id_str}`);
         const tweetRefVal = (await tweetRef.once('value')).val();
@@ -154,78 +154,85 @@ export class AppService {
 
   @Cron('30 2,12,22,32,42,52 * * * *')
   async _wordart(key: string = '') {
-    if (key) {
-      let startAt: number;
-      const usersRef = db.ref('users');
-
-      (
-        await usersRef
-          .orderByChild('tweeted_at')
-          .limitToLast(1)
-          .once('value')
-      ).forEach(user => {
-        startAt = +moment(user.val().tweeted_at)
-          .subtract(10, 'minutes')
-          .format('x');
-      });
-
-      const data = { startAt, tweeters: [], wordArt: {} };
-
-      for (let i = 0; data.tweeters.length < 10 && i < 10; i++) {
-        if (i)
-          data.startAt = +moment(data.startAt)
-            .subtract(i * 10, 'minutes')
-            .format('x');
+    switch (key) {
+      case 'favourites':
+      case 'followers':
+      case 'friends':
+      case 'tweeted_at': {
+        let startAt: number;
+        const usersRef = db.ref('users');
 
         (
           await usersRef
             .orderByChild('tweeted_at')
-            .startAt(data.startAt)
+            .limitToLast(1)
             .once('value')
         ).forEach(user => {
-          const value = user.val()[
-            `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
-          ];
-
-          if (0 < value)
-            data.tweeters.push({
-              key: user.key,
-              value: Math.ceil(value),
-            });
+          startAt = +moment(user.val().tweeted_at)
+            .subtract(10, 'minutes')
+            .format('x');
         });
-      }
 
-      try {
-        if (data.tweeters.length) {
-          const rpc = await this.amqpService.request(
-            {},
-            {
-              sendOpts: {
-                headers: {
-                  image: env.WORDART_IMAGE_URLS
-                    ? sample(env.WORDART_IMAGE_URLS.split('|'))
-                    : '',
-                  words: data.tweeters
-                    .map(item => `${item.key};${item.value}`)
-                    .join('\n'),
+        const data = { startAt, tweeters: [], wordArt: {} };
+
+        for (let i = 0; data.tweeters.length < 10 && i < 10; i++) {
+          if (i)
+            data.startAt = +moment(data.startAt)
+              .subtract(i * 10, 'minutes')
+              .format('x');
+
+          (
+            await usersRef
+              .orderByChild('tweeted_at')
+              .startAt(data.startAt)
+              .once('value')
+          ).forEach(user => {
+            const value = user.val()[
+              `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
+            ];
+
+            if (0 < value)
+              data.tweeters.push({
+                key: user.key,
+                value: Math.ceil(value),
+              });
+          });
+        }
+
+        try {
+          if (data.tweeters.length) {
+            const rpc = await this.amqpService.request(
+              {},
+              {
+                sendOpts: {
+                  headers: {
+                    image: env.WORDART_IMAGE_URLS
+                      ? sample(env.WORDART_IMAGE_URLS.split('|'))
+                      : '',
+                    words: data.tweeters
+                      .map(item => `${item.key};${item.value}`)
+                      .join('\n'),
+                  },
                 },
               },
-            },
-          );
+            );
 
-          data.wordArt = JSON.parse(rpc.content.toString());
+            data.wordArt = JSON.parse(rpc.content.toString());
 
-          if (this.cache) this.cache[key] = data;
-          else this.cache = { [key]: data };
+            if (this.cache) this.cache[key] = data;
+            else this.cache = { [key]: data };
+          }
+        } catch (e) {
+          Logger.log(e.message, `AppService/${key}`);
         }
-      } catch (e) {
-        Logger.log(e.message, `AppService/${key}`);
       }
-    } else {
-      await this._wordart('favourites');
-      await this._wordart('followers');
-      await this._wordart('friends');
-      await this._wordart('tweeted_at');
+
+      default: {
+        await this._wordart('favourites');
+        await this._wordart('followers');
+        await this._wordart('friends');
+        await this._wordart('tweeted_at');
+      }
     }
 
     return this.cache;
