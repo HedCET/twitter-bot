@@ -234,8 +234,6 @@ export class AppService {
         await this._wordart('followers');
         await this._wordart('friends');
         await this._wordart('tweeted_at');
-
-        break;
       }
     }
 
