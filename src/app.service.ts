@@ -281,4 +281,54 @@ export class AppService {
       total: hits.length,
     };
   }
+
+  @Cron('30 2,12,22,32,42,52 * * * *')
+  async twitterDay() {
+    for (let i = 0; i < 20; i++) {
+      const startAt = +moment()
+        .subtract(i + 1, 'years')
+        .format('x');
+
+      (
+        await db
+          .ref('users')
+          .orderByChild('created_at')
+          .startAt(startAt)
+          .limitToFirst(10)
+          .once('value')
+      ).forEach(user => {
+        const createdAt = moment(user.val().created_at);
+        const tweetedAt = moment(user.val().tweeted_at);
+
+        if (
+          createdAt.isBefore(
+            +moment(startAt)
+              .add(10, 'minutes')
+              .format('x'),
+          ) &&
+          tweetedAt.isAfter(
+            +moment()
+              .subtract(1, 'weeks')
+              .format('x'),
+          )
+        ) {
+          try {
+            this.twitter.post('statuses/update', {
+              status: `${
+                env.TWITTER_WISHES
+                  ? `${sample(env.TWITTER_WISHES.split('|'))} \n`
+                  : ''
+              }#HappyTwitterDay @${user.key} \n#${createdAt
+                .utcOffset('+05:30')
+                .format('h:m A')}`,
+            });
+          } catch (e) {
+            Logger.log(e.message, 'AppService/twitterDay');
+          }
+        }
+      });
+    }
+
+    return true;
+  }
 }
