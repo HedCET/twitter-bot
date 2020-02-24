@@ -21,8 +21,6 @@ const schema = {
   TWITTER_ACCESS_TOKEN_SECRET: joi.string().required(),
   TWITTER_CONSUMER_KEY: joi.string().required(),
   TWITTER_CONSUMER_SECRET: joi.string().required(),
-  TWITTER_DAY_EXCLUDES: joi.string().default(''),
-  TWITTER_DAY_WISHES: joi.string().default(''),
   WORDART_IMAGE_URLS: joi.string().required(),
 };
 
