@@ -312,7 +312,7 @@ export class AppService {
               .format('x'),
           )
         ) {
-          if (-1 < env.TWITTER_DAY_EXCLUDES.split('|').indexOf(user.key)) {
+          if (-1 == env.TWITTER_DAY_EXCLUDES.split('|').indexOf(user.key)) {
             this.twitter.post('statuses/update', {
               status: `${
                 env.TWITTER_DAY_WISHES
