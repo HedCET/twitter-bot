@@ -312,18 +312,16 @@ export class AppService {
               .format('x'),
           )
         ) {
-          try {
+          if (-1 < env.TWITTER_DAY_EXCLUDES.split('|').indexOf(user.key)) {
             this.twitter.post('statuses/update', {
               status: `${
-                env.TWITTER_WISHES
-                  ? `${sample(env.TWITTER_WISHES.split('|'))} \n`
+                env.TWITTER_DAY_WISHES
+                  ? `${sample(env.TWITTER_DAY_WISHES.split('|'))} \n`
                   : ''
               }#HappyTwitterDay @${user.key} \n#${createdAt
                 .utcOffset('+05:30')
                 .format('h:m A')}`,
             });
-          } catch (e) {
-            Logger.log(e.message, 'AppService/twitterDay');
           }
         }
       });
