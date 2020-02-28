@@ -66,6 +66,8 @@ export class AppService {
         if (tweet.user.followers_count)
           user.followers = tweet.user.followers_count;
         if (tweet.user.friends_count) user.friends = tweet.user.friends_count;
+        if (tweet.user.listed_count) user.lists = tweet.user.listed_count;
+        if (tweet.user.statuses_count) user.tweets = tweet.user.statuses_count;
 
         const userRef = db.ref(`users/${tweet.user.screen_name}`);
         const userRefVal = (await userRef.once('value')).val();
@@ -95,6 +97,10 @@ export class AppService {
           )
             user.last_friends_average =
               (tweet.user.friends_count - userRefVal.friends) /
+              user.last_tweeted_at_frequency;
+          if (userRefVal.lists && tweet.user.listed_count != userRefVal.lists)
+            user.last_lists_average =
+              (tweet.user.listed_count - userRefVal.lists) /
               user.last_tweeted_at_frequency;
 
           userRef.update(user);
@@ -158,6 +164,7 @@ export class AppService {
       case 'favourites':
       case 'followers':
       case 'friends':
+      // case 'lists':
       case 'tweeted_at': {
         let startAt: number;
         const usersRef = db.ref('users');
@@ -233,6 +240,7 @@ export class AppService {
         await this._wordart('favourites');
         await this._wordart('followers');
         await this._wordart('friends');
+        // await this._wordart('lists');
         await this._wordart('tweeted_at');
       }
     }
@@ -248,7 +256,13 @@ export class AppService {
       const json = {};
 
       each(
-        pick(this.cache, ['favourites', 'followers', 'friends', 'tweeted_at']),
+        pick(this.cache, [
+          'favourites',
+          'followers',
+          'friends',
+          'lists',
+          'tweeted_at',
+        ]),
         (value, key) => {
           json[key] = {
             hits: value.tweeters.map(tweeter => tweeter.key),

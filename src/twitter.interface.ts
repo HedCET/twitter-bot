@@ -7,7 +7,9 @@ export interface search_res_statuses {
     favourites_count: number;
     followers_count: number;
     friends_count: number;
+    listed_count: number;
     screen_name: string;
+    statuses_count: number;
   };
 }
 
