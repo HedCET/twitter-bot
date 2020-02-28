@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { compact, each, pick, sample, sortBy, takeRight } from 'lodash';
+import { compact, each, find, pick, sample, sortBy, takeRight } from 'lodash';
 import * as moment from 'moment';
 import * as twit from 'twit';
 
@@ -164,7 +164,7 @@ export class AppService {
       case 'favourites':
       case 'followers':
       case 'friends':
-      // case 'lists':
+      case 'lists':
       case 'tweeted_at': {
         let startAt: number;
         const usersRef = db.ref('users');
@@ -198,7 +198,7 @@ export class AppService {
               `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
             ];
 
-            if (0 < value)
+            if (0 < value && !find(data.tweeters, { key: user.key }))
               data.tweeters.push({
                 key: user.key,
                 value: Math.ceil(value),
@@ -206,9 +206,9 @@ export class AppService {
           });
         }
 
-        try {
-          if (data.tweeters.length) {
-            const rpc = await this.amqpService.request(
+        if (data.tweeters.length)
+          this.amqpService
+            .request(
               {},
               {
                 sendOpts: {
@@ -222,16 +222,14 @@ export class AppService {
                   },
                 },
               },
-            );
+            )
+            .then(r => {
+              data.wordArt = JSON.parse(r.content.toString());
 
-            data.wordArt = JSON.parse(rpc.content.toString());
-
-            if (this.cache) this.cache[key] = data;
-            else this.cache = { [key]: data };
-          }
-        } catch (e) {
-          Logger.log(e.message, `AppService/${key}`);
-        }
+              if (this.cache) this.cache[key] = data;
+              else this.cache = { [key]: data };
+            })
+            .catch(e => Logger.log(e.message, `AppService/${key}`));
 
         break;
       }
@@ -240,7 +238,7 @@ export class AppService {
         await this._wordart('favourites');
         await this._wordart('followers');
         await this._wordart('friends');
-        // await this._wordart('lists');
+        await this._wordart('lists');
         await this._wordart('tweeted_at');
       }
     }
