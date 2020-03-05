@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { compact, each, find, pick, sample, sortBy, takeRight } from 'lodash';
+import { each, find, pick, random, sample, sortBy, takeRight } from 'lodash';
 import * as moment from 'moment';
 import * as twit from 'twit';
 
@@ -14,6 +14,13 @@ import { userInterface } from './user.interface';
 @Injectable()
 export class AppService {
   private cache: { [key: string]: any };
+  private readonly services = [
+    'favourites',
+    'followers',
+    'friends',
+    'lists',
+    'tweeted_at',
+  ];
 
   constructor(
     private readonly amqpService: AmqpService,
@@ -160,88 +167,80 @@ export class AppService {
 
   @Cron('30 2,12,22,32,42,52 * * * *')
   async _wordart(key: string = '') {
-    switch (key) {
-      case 'favourites':
-      case 'followers':
-      case 'friends':
-      case 'lists':
-      case 'tweeted_at': {
-        let startAt: number;
-        const usersRef = db.ref('users');
+    if (!this.cache)
+      this.cache = {
+        WORDART_INDEX: random(env.WORDART_IMAGE_URLS.split('|').length),
+      };
+
+    if (-1 < this.services.indexOf(key)) {
+      let startAt: number;
+      const usersRef = db.ref('users');
+
+      (
+        await usersRef
+          .orderByChild('tweeted_at')
+          .limitToLast(1)
+          .once('value')
+      ).forEach(user => {
+        startAt = +moment(user.val().tweeted_at)
+          .subtract(10, 'minutes')
+          .format('x');
+      });
+
+      const data = { startAt, tweeters: [], wordArt: {} };
+
+      for (let i = 0; data.tweeters.length < 10 && i < 10; i++) {
+        if (i)
+          data.startAt = +moment(data.startAt)
+            .subtract(i * 10, 'minutes')
+            .format('x');
 
         (
           await usersRef
             .orderByChild('tweeted_at')
-            .limitToLast(1)
+            .startAt(data.startAt)
             .once('value')
         ).forEach(user => {
-          startAt = +moment(user.val().tweeted_at)
-            .subtract(10, 'minutes')
-            .format('x');
+          const value = user.val()[
+            `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
+          ];
+
+          if (0 < value && !find(data.tweeters, { key: user.key }))
+            data.tweeters.push({
+              key: user.key,
+              value: Math.ceil(value),
+            });
         });
+      }
 
-        const data = { startAt, tweeters: [], wordArt: {} };
-
-        for (let i = 0; data.tweeters.length < 10 && i < 10; i++) {
-          if (i)
-            data.startAt = +moment(data.startAt)
-              .subtract(i * 10, 'minutes')
-              .format('x');
-
-          (
-            await usersRef
-              .orderByChild('tweeted_at')
-              .startAt(data.startAt)
-              .once('value')
-          ).forEach(user => {
-            const value = user.val()[
-              `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
-            ];
-
-            if (0 < value && !find(data.tweeters, { key: user.key }))
-              data.tweeters.push({
-                key: user.key,
-                value: Math.ceil(value),
-              });
-          });
-        }
-
-        if (data.tweeters.length)
-          this.amqpService
-            .request(
-              {},
-              {
-                sendOpts: {
-                  headers: {
-                    image: env.WORDART_IMAGE_URLS
-                      ? sample(env.WORDART_IMAGE_URLS.split('|'))
-                      : '',
-                    words: data.tweeters
-                      .map(item => `${item.key};${item.value}`)
-                      .join('\n'),
-                  },
+      if (data.tweeters.length)
+        this.amqpService
+          .request(
+            {},
+            {
+              sendOpts: {
+                headers: {
+                  image: sample(
+                    env.WORDART_IMAGE_URLS.split('|')[
+                      this.cache.WORDART_INDEX++ %
+                        env.WORDART_IMAGE_URLS.split('|').length
+                    ],
+                  ),
+                  words: data.tweeters
+                    .map(item => `${item.key};${item.value}`)
+                    .join('\n'),
                 },
               },
-            )
-            .then(r => {
-              data.wordArt = JSON.parse(r.content.toString());
+            },
+          )
+          .then(r => {
+            data.wordArt = JSON.parse(r.content.toString());
 
-              if (this.cache) this.cache[key] = data;
-              else this.cache = { [key]: data };
-            })
-            .catch(e => Logger.log(e.message, `AppService/${key}`));
-
-        break;
-      }
-
-      default: {
-        await this._wordart('favourites');
-        await this._wordart('followers');
-        await this._wordart('friends');
-        await this._wordart('lists');
-        await this._wordart('tweeted_at');
-      }
-    }
+            if (this.cache) this.cache[key] = data;
+            else this.cache = { [key]: data };
+          })
+          .catch(e => Logger.log(e.message, `AppService/${key}`));
+    } else for (const service of this.services) await this._wordart(service);
 
     return this.cache;
   }
@@ -249,25 +248,17 @@ export class AppService {
   async wordart(key: string = '') {
     if (!this.cache) await this._wordart();
 
-    if (key && this.cache[key]) return this.cache[key].wordArt;
+    if (key && -1 < this.services.indexOf(key) && this.cache[key])
+      return this.cache[key].wordArt;
     else {
       const json = {};
 
-      each(
-        pick(this.cache, [
-          'favourites',
-          'followers',
-          'friends',
-          'lists',
-          'tweeted_at',
-        ]),
-        (value, key) => {
-          json[key] = {
-            hits: value.tweeters.map(tweeter => tweeter.key),
-            startAt: value.startAt,
-          };
-        },
-      );
+      each(pick(this.cache, this.services), (value, key) => {
+        json[key] = {
+          hits: value.tweeters.map(tweeter => tweeter.key),
+          startAt: value.startAt,
+        };
+      });
 
       return json;
     }
