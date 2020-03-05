@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { each, find, pick, random, sortBy, takeRight } from 'lodash';
+import { each, find, isEqual, pick, random, size, sortBy } from 'lodash';
 import * as moment from 'moment';
 import * as twit from 'twit';
 
@@ -110,7 +110,7 @@ export class AppService {
               (tweet.user.listed_count - userRefVal.lists) /
               user.last_tweeted_at_frequency;
 
-          userRef.update(user);
+          if (!isEqual(user, userRefVal)) userRef.update(user);
         } else {
           // Logger.log({ [tweet.user.screen_name]: user }, 'AppService/update');
           userRef.set(user);
@@ -271,15 +271,23 @@ export class AppService {
           .orderByKey()
           .startAt(key)
           .endAt(`${key}\uf8ff`)
+          .limitToFirst(10)
           .once('value')
-      : await userRef.orderByChild('tweeted_at').once('value')
+      : await userRef
+          .orderByChild('tweeted_at')
+          .limitToLast(10)
+          .once('value')
     ).forEach(snapshot => {
       hits.push({ ...snapshot.val(), _id: snapshot.key });
     });
 
-    return {
-      hits: takeRight(sortBy(hits, ['tweeted_at']), 10).reverse(),
-      total: hits.length,
-    };
+    if (this.cache && !this.cache.TOTAL_USERS)
+      this.cache.TOTAL_USERS = size((await userRef.once('value')).val());
+
+    const total = this.cache?.TOTAL_USERS
+      ? this.cache?.TOTAL_USERS
+      : hits.length;
+
+    return { hits, total };
   }
 }
