@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { each, find, pick, random, sample, sortBy, takeRight } from 'lodash';
+import { each, find, pick, random, sortBy, takeRight } from 'lodash';
 import * as moment from 'moment';
 import * as twit from 'twit';
 
@@ -220,12 +220,10 @@ export class AppService {
             {
               sendOpts: {
                 headers: {
-                  image: sample(
-                    env.WORDART_IMAGE_URLS.split('|')[
-                      this.cache.WORDART_INDEX++ %
-                        env.WORDART_IMAGE_URLS.split('|').length
-                    ],
-                  ),
+                  image: env.WORDART_IMAGE_URLS.split('|')[
+                    this.cache.WORDART_INDEX++ %
+                      env.WORDART_IMAGE_URLS.split('|').length
+                  ],
                   words: data.tweeters
                     .map(item => `${item.key};${item.value}`)
                     .join('\n'),
