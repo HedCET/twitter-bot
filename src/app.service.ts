@@ -4,6 +4,7 @@ import * as BigInt from 'big-integer';
 import { each, find, isEqual, pick, random, size, sortBy } from 'lodash';
 import * as moment from 'moment';
 import * as twit from 'twit';
+import { isJSON } from 'validator';
 
 import { AmqpService } from './amqp.service';
 import { env } from './env.validations';
@@ -231,13 +232,27 @@ export class AppService {
               },
             },
           )
-          .then(r => {
-            data.wordArt = JSON.parse(r.content.toString());
-
-            if (this.cache) this.cache[key] = data;
-            else this.cache = { [key]: data };
+          .then(async r => {
+            const content = r.content.toString();
+            if (isJSON(content)) {
+              const json = JSON.parse(content);
+              Logger.log(
+                { statusCode: json.statusCode, statusText: json.statusText },
+                `AppService/${key}`,
+              );
+              if (json.statusCode == 200) {
+                data.wordArt = json.response;
+                if (this.cache) this.cache[key] = data;
+                else this.cache = { [key]: data };
+              } else await this._wordart(key);
+            } else
+              Logger.error(
+                content,
+                'invalid JSON response',
+                `AppService/${key}`,
+              );
           })
-          .catch(e => Logger.log(e.message, `AppService/${key}`));
+          .catch(e => Logger.error(e, e.message, `AppService/${key}`));
     } else for (const service of this.services) await this._wordart(service);
 
     return this.cache;
