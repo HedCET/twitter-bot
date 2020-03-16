@@ -14,7 +14,12 @@ import { AppModule } from './app.module';
 import { env } from './env.validations';
 
 const bootstrap = async () => {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger:
+      env.ENV === 'development'
+        ? ['debug', 'error', 'log', 'verbose', 'warn']
+        : ['debug', 'error', 'warn'],
+  });
 
   app.enableCors();
 
@@ -30,7 +35,7 @@ const bootstrap = async () => {
   app.use(csurf({ cookie: true }));
   // app.use((req, res, next) => {
   //   const _csurf = csurf({ cookie: true });
-  //   if (-1 < ['/update'].indexOf(req.url)) return next();
+  //   if (-1 < ['/path'].indexOf(req.url)) return next();
   //   _csurf(req, res, next);
   // });
   app.use(
