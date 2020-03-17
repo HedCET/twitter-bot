@@ -8,7 +8,7 @@ import * as csurf from 'csurf';
 import * as expressRateLimit from 'express-rate-limit';
 import * as helmet from 'helmet';
 
-import { AllExceptionsFilter } from './all.exceptions.filter';
+// import { AllExceptionsFilter } from './all.exceptions.filter';
 import { AppModule } from './app.module';
 
 import { env } from './env.validations';
@@ -18,7 +18,7 @@ const bootstrap = async () => {
     logger:
       env.ENV === 'development'
         ? ['debug', 'error', 'log', 'verbose', 'warn']
-        : ['debug', 'error', 'warn'],
+        : ['error', 'warn'],
   });
 
   app.enableCors();
@@ -46,7 +46,7 @@ const bootstrap = async () => {
   );
   app.use(compression());
 
-  app.useGlobalFilters(new AllExceptionsFilter());
+  // app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       disableErrorMessages: env.ENV === 'development' ? false : true,

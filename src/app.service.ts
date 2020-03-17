@@ -30,7 +30,7 @@ export class AppService {
   ) {}
 
   // twitter service handler
-  @Cron('0 0,10,20,30,40,50 * * * *')
+  // @Cron('0 0,10,20,30,40,50 * * * *')
   async update() {
     // pick twitter instance
 
@@ -176,7 +176,7 @@ export class AppService {
   }
 
   // populate wordart in cache
-  @Cron('30 2,12,22,32,42,52 * * * *')
+  // @Cron('30 2,12,22,32,42,52 * * * *')
   async _wordart(key: string = '') {
     let ERROR_THRESHOLD = 10;
 

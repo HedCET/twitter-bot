@@ -18,10 +18,13 @@ const schema = {
   REDIS_HOST: joi.string().required(),
   REDIS_PASSWORD: joi.string().required(),
   REDIS_PORT: joi.number().required(),
-  ROOT_URL: joi.string().default('localhost:8080'),
+  ROOT_URL: joi.string().default('http://localhost:8080'),
   SECRET: joi.string().default('secret'),
   TWITTER_ACCESS_TOKEN: joi.string().required(),
   TWITTER_ACCESS_TOKEN_SECRET: joi.string().required(),
+  TWITTER_CALLBACK_URL: joi
+    .string()
+    .default('http://localhost:8080/twitter_callback'),
   TWITTER_CONSUMER_KEY: joi.string().required(),
   TWITTER_CONSUMER_SECRET: joi.string().required(),
   WORDART_IMAGE_URLS: joi.string().default(''),

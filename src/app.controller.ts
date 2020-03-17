@@ -23,7 +23,7 @@ export class AppController {
   }
 
   @Get('search')
-  @UseInterceptors(CacheInterceptor)
+  // @UseInterceptors(CacheInterceptor)
   async search(@Query('key') key: string = '') {
     return this.appService.search(key);
   }
