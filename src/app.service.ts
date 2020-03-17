@@ -1,9 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { CACHE_MANAGER, Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
 import { each, find, isEqual, pick, random, size, sortBy } from 'lodash';
 import * as moment from 'moment';
-import * as twit from 'twit';
+
 import { isJSON } from 'validator';
 
 import { AmqpService } from './amqp.service';
@@ -14,7 +14,7 @@ import { userInterface } from './user.interface';
 
 @Injectable()
 export class AppService {
-  private cache: { [key: string]: any };
+  private WORDART_INDEX = random(env.WORDART_IMAGE_URLS.split('|').length);
   private readonly services = [
     'favourites',
     'followers',
@@ -25,10 +25,12 @@ export class AppService {
 
   constructor(
     private readonly amqpService: AmqpService,
-    @Inject('TWITTER') private readonly twitter: typeof twit,
+    @Inject(CACHE_MANAGER) private readonly cacheManager,
+    @Inject('TWITTER') private readonly twitter,
   ) {}
 
-  // @Cron('0 0,10,20,30,40,50 * * * *')
+  // twitter service handler
+  @Cron('0 0,10,20,30,40,50 * * * *')
   async update() {
     // pick twitter instance
 
@@ -135,7 +137,7 @@ export class AppService {
           'AppService/update',
         );
 
-        // RxJS stream
+        // publish to RxJS stream
 
         const tweetRef = db.ref(`tweets/${status.id_str}`);
         const tweetRefVal = (await tweetRef.once('value')).val();
@@ -173,17 +175,16 @@ export class AppService {
     return true;
   }
 
-  // @Cron('30 2,12,22,32,42,52 * * * *')
+  // populate wordart in cache
+  @Cron('30 2,12,22,32,42,52 * * * *')
   async _wordart(key: string = '') {
-    if (!this.cache)
-      this.cache = {
-        WORDART_INDEX: random(env.WORDART_IMAGE_URLS.split('|').length),
-      };
+    let ERROR_THRESHOLD = 10;
 
     if (-1 < this.services.indexOf(key)) {
       let startAt: number;
       const usersRef = db.ref('users');
 
+      // set startAt 10 minutes before
       (
         await usersRef
           .orderByChild('tweeted_at')
@@ -195,9 +196,12 @@ export class AppService {
           .format('x');
       });
 
+      // data format in each key
       const data = { startAt, tweeters: [], wordArt: {} };
 
+      // iterate max 10 times at-least 10 tweeters
       for (let i = 0; data.tweeters.length < 10 && i < 10; i++) {
+        // subtract 10 minutes except 1'st iteration
         if (i)
           data.startAt = +moment(data.startAt)
             .subtract(i * 10, 'minutes')
@@ -213,6 +217,7 @@ export class AppService {
             `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
           ];
 
+          // positive tweeters
           if (0 < value && !find(data.tweeters, { key: user.key }))
             data.tweeters.push({
               key: user.key,
@@ -228,10 +233,12 @@ export class AppService {
             {
               sendOpts: {
                 headers: {
+                  // randomizing images
                   image: env.WORDART_IMAGE_URLS.split('|')[
-                    this.cache.WORDART_INDEX++ %
+                    this.WORDART_INDEX++ %
                       env.WORDART_IMAGE_URLS.split('|').length
                   ],
+                  // words in csv format
                   words: data.tweeters
                     .map(item => `${item.key};${item.value}`)
                     .join('\n'),
@@ -241,17 +248,31 @@ export class AppService {
           )
           .then(async r => {
             const content = r.content.toString();
+
             if (isJSON(content)) {
               const json = JSON.parse(content);
+
               Logger.log(
                 { statusCode: json.statusCode, statusText: json.statusText },
                 `AppService/${key}`,
               );
+
               if (json.statusCode == 200) {
                 data.wordArt = json.response;
-                if (this.cache) this.cache[key] = data;
-                else this.cache = { [key]: data };
-              } else await this._wordart(key);
+
+                // put it in cache
+                this.cacheManager.set(
+                  '_wordart',
+                  {
+                    ...((await this.cacheManager.get('_wordart')) || {}),
+                    [key]: data,
+                  },
+                  { ttl: 0 },
+                );
+              } else {
+                // conditional retry
+                if (0 < ERROR_THRESHOLD--) await this._wordart(key);
+              }
             } else
               Logger.error(
                 content,
@@ -262,18 +283,26 @@ export class AppService {
           .catch(e => Logger.error(e, e.message, `AppService/${key}`));
     } else for (const service of this.services) await this._wordart(service);
 
-    return this.cache;
+    return true;
   }
 
+  // wordart route handler
   async wordart(key: string = '') {
-    if (!this.cache) await this._wordart();
+    let _wordart = await this.cacheManager.get('_wordart');
 
-    if (key && -1 < this.services.indexOf(key) && this.cache[key])
-      return this.cache[key].wordArt;
+    // populate cache
+    if (!_wordart) {
+      await this._wordart();
+      _wordart = await this.cacheManager.get('_wordart');
+    }
+
+    if (key && -1 < this.services.indexOf(key) && _wordart[key])
+      return _wordart[key].wordArt;
     else {
       const json = {};
 
-      each(pick(this.cache, this.services), (value, key) => {
+      // meta data response
+      each(pick(_wordart, this.services), (value, key) => {
         json[key] = {
           hits: value.tweeters.map(tweeter => tweeter.key),
           startAt: value.startAt,
@@ -284,8 +313,10 @@ export class AppService {
     }
   }
 
+  // search route handler
   async search(key: string = '') {
     const hits = [];
+    const total = (await db.ref('users_count').once('value')).val();
     const usersRef = db.ref('users');
 
     (key
@@ -303,7 +334,6 @@ export class AppService {
       hits.push({ ...snapshot.val(), _id: snapshot.key });
     });
 
-    const total = (await db.ref('users_count').once('value')).val();
     return { hits, total };
   }
 }
