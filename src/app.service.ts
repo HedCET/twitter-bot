@@ -1,7 +1,7 @@
 import { CACHE_MANAGER, Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { each, find, isEqual, pick, random, size, sortBy } from 'lodash';
+import { each, find, isEqual, pick, random, sortBy } from 'lodash';
 import * as moment from 'moment';
 
 import { isJSON } from 'validator';

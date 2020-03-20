@@ -1,4 +1,6 @@
 import { CacheModule, Global, Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { ScheduleModule } from '@nestjs/schedule';
 import * as redisStore from 'cache-manager-redis-store';
 
@@ -7,6 +9,7 @@ import { AmqpService } from './amqp.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { env } from './env.validations';
+import { JwtStrategy } from './jwt.strategy';
 import { TwitterAuthController } from './twitter.auth.controller';
 import { TwitterAuthService } from './twitter.auth.service';
 import { twitterProviders } from './twitter.providers';
@@ -22,6 +25,8 @@ import { twitterProviders } from './twitter.providers';
       store: redisStore,
       ttl: 600,
     }),
+    JwtModule.register({ secret: env.SECRET }),
+    PassportModule.register({ defaultStrategy: 'jwt' }),
     ScheduleModule.forRoot(),
   ],
   providers: [
@@ -29,6 +34,7 @@ import { twitterProviders } from './twitter.providers';
     ...twitterProviders,
     AmqpService,
     AppService,
+    JwtStrategy,
     TwitterAuthService,
   ],
 })
