@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as compression from 'compression';
@@ -10,16 +10,16 @@ import * as helmet from 'helmet';
 
 // import { AllExceptionsFilter } from './all.exceptions.filter';
 import { AppModule } from './app.module';
-
 import { env } from './env.validations';
 
+Logger.overrideLogger(
+  env.ENV == 'development'
+    ? ['debug', 'error', 'log', 'verbose', 'warn']
+    : ['error', 'warn'],
+);
+
 const bootstrap = async () => {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger:
-      env.ENV == 'development'
-        ? ['debug', 'error', 'log', 'verbose', 'warn']
-        : ['error', 'warn'],
-  });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.enableCors();
 
