@@ -31,8 +31,8 @@ const bootstrap = async () => {
       secret: env.SECRET,
     }),
   );
-  app.use(cookieParser());
-  app.use(csurf({ cookie: true }));
+  // app.use(cookieParser());
+  // app.use(csurf({ cookie: true }));
   // app.use((req, res, next) => {
   //   const _csurf = csurf({ cookie: true });
   //   if (-1 < ['/path'].indexOf(req.url)) return next();
