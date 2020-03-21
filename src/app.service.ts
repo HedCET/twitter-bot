@@ -86,45 +86,50 @@ export class AppService {
         const userRef = db.ref(`users/${status.user.screen_name}`);
         const userRefVal = (await userRef.once('value')).val();
 
-        if (userRefVal && moment(tweeted_at).isAfter(userRefVal.tweeted_at)) {
-          user.last_tweeted_at_frequency = moment
-            .duration(moment(tweeted_at).diff(userRefVal.tweeted_at))
-            .asDays();
+        if (userRefVal) {
+          if (moment(tweeted_at).isAfter(userRefVal.tweeted_at)) {
+            user.last_tweeted_at_frequency = moment
+              .duration(moment(tweeted_at).diff(userRefVal.tweeted_at))
+              .asDays();
 
-          // average favourites per day
-          if (
-            userRefVal.favourites &&
-            status.user.favourites_count != userRefVal.favourites
-          )
-            user.last_favourites_average =
-              (status.user.favourites_count - userRefVal.favourites) /
-              user.last_tweeted_at_frequency;
+            // average favourites per day
+            if (
+              userRefVal.favourites &&
+              status.user.favourites_count != userRefVal.favourites
+            )
+              user.last_favourites_average =
+                (status.user.favourites_count - userRefVal.favourites) /
+                user.last_tweeted_at_frequency;
 
-          // average followers per day
-          if (
-            userRefVal.followers &&
-            status.user.followers_count != userRefVal.followers
-          )
-            user.last_followers_average =
-              (status.user.followers_count - userRefVal.followers) /
-              user.last_tweeted_at_frequency;
+            // average followers per day
+            if (
+              userRefVal.followers &&
+              status.user.followers_count != userRefVal.followers
+            )
+              user.last_followers_average =
+                (status.user.followers_count - userRefVal.followers) /
+                user.last_tweeted_at_frequency;
 
-          // average friends per day
-          if (
-            userRefVal.friends &&
-            status.user.friends_count != userRefVal.friends
-          )
-            user.last_friends_average =
-              (status.user.friends_count - userRefVal.friends) /
-              user.last_tweeted_at_frequency;
+            // average friends per day
+            if (
+              userRefVal.friends &&
+              status.user.friends_count != userRefVal.friends
+            )
+              user.last_friends_average =
+                (status.user.friends_count - userRefVal.friends) /
+                user.last_tweeted_at_frequency;
 
-          // average lists per day
-          if (userRefVal.lists && status.user.listed_count != userRefVal.lists)
-            user.last_lists_average =
-              (status.user.listed_count - userRefVal.lists) /
-              user.last_tweeted_at_frequency;
+            // average lists per day
+            if (
+              userRefVal.lists &&
+              status.user.listed_count != userRefVal.lists
+            )
+              user.last_lists_average =
+                (status.user.listed_count - userRefVal.lists) /
+                user.last_tweeted_at_frequency;
 
-          if (!isEqual(user, userRefVal)) userRef.update(user);
+            if (!isEqual(user, userRefVal)) userRef.update(user);
+          }
         } else {
           userRef.set(user);
 
