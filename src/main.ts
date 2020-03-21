@@ -16,7 +16,7 @@ import { env } from './env.validations';
 const bootstrap = async () => {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger:
-      env.ENV === 'development'
+      env.ENV == 'development'
         ? ['debug', 'error', 'log', 'verbose', 'warn']
         : ['error', 'warn'],
   });
@@ -49,7 +49,7 @@ const bootstrap = async () => {
   // app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(
     new ValidationPipe({
-      disableErrorMessages: env.ENV === 'development' ? false : true,
+      disableErrorMessages: env.ENV == 'development' ? false : true,
       forbidNonWhitelisted: true,
       forbidUnknownValues: true,
       transform: true,
