@@ -137,10 +137,11 @@ export class AppService {
           await db.ref(`users_count`).transaction(count => (count || 0) + 1);
         }
 
-        Logger.log(
-          { i: i + 1, [status.user.screen_name]: user },
-          'AppService/update',
-        );
+        if (env.ENV == 'development')
+          Logger.log(
+            { i: i + 1, [status.user.screen_name]: user },
+            'AppService/update',
+          );
 
         // publish to RxJS stream
 
