@@ -2,14 +2,16 @@ import { CacheModule, Global, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ScheduleModule } from '@nestjs/schedule';
-import * as redisStore from 'cache-manager-redis-store';
+import { MongooseModule } from '@nestjs/mongoose';
 
 import { amqpProviders } from './amqp.providers';
 import { AmqpService } from './amqp.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { dbModels } from './db.models';
 import { env } from './env.validations';
 import { JwtStrategy } from './jwt.strategy';
+import { MessageService } from './message.service';
 import { TwitterAuthController } from './twitter.auth.controller';
 import { TwitterAuthService } from './twitter.auth.service';
 import { twitterProviders } from './twitter.providers';
@@ -19,13 +21,15 @@ import { twitterProviders } from './twitter.providers';
   controllers: [AppController, TwitterAuthController],
   imports: [
     CacheModule.register({
-      auth_pass: env.REDIS_PASSWORD,
-      host: env.REDIS_HOST,
-      port: env.REDIS_PORT,
-      store: redisStore,
+      max: 1000 * 60,
       ttl: 600,
     }),
     JwtModule.register({ secret: env.SECRET }),
+    MongooseModule.forFeature([...dbModels]),
+    MongooseModule.forRoot(env.MONGO_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     ScheduleModule.forRoot(),
   ],
@@ -35,6 +39,7 @@ import { twitterProviders } from './twitter.providers';
     AmqpService,
     AppService,
     JwtStrategy,
+    MessageService,
     TwitterAuthService,
   ],
 })

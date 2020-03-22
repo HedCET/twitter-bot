@@ -1,8 +1,6 @@
 # random
 .development
 #.wordart
-firebase.rules.json
-serviceAccount.json
 /dist
 
 # npm

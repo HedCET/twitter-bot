@@ -1,8 +1,6 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
-import { db } from './firebase';
-
 @Injectable()
 export class TwitterAuthService {
   constructor(
@@ -44,22 +42,7 @@ export class TwitterAuthService {
           ) => {
             if (error) reject(error);
             else {
-              const account = {
-                acess_token: acessToken,
-                acess_token_secret: acessTokenSecret,
-                blocked: null,
-                roles: ['user'],
-              };
-
-              const accountRef = db.ref(`accounts/${r.screen_name}`);
-              const accountRefVal = (await accountRef.once('value')).val();
-
-              if (accountRefVal) {
-                account.blocked = accountRefVal.blocked;
-                account.roles = accountRefVal.roles;
-
-                accountRef.update(account);
-              } else accountRef.set(account);
+              // db update
 
               resolve({
                 accessToken: this.jwtService.sign({ _id: r.screen_name }),

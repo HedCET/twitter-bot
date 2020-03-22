@@ -1,21 +1,31 @@
-import { CACHE_MANAGER, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  CACHE_MANAGER,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { each, find, isEqual, pick, random, sortBy } from 'lodash';
+import { each, find, pick, random, sortBy } from 'lodash';
 import * as moment from 'moment';
-
+import { Model } from 'mongoose';
+import * as twit from 'twit';
 import { isJSON } from 'validator';
 
 import { AmqpService } from './amqp.service';
+import { modelTokens } from './db.models';
 import { env } from './env.validations';
-import { db } from './firebase';
+// import { MessageService } from './message.service';
+import { tweetsModel } from './tweets.model';
 import { search_req, search_res } from './twitter.interface';
-import { userInterface } from './user.interface';
+import { usersModel } from './users.model';
 
 @Injectable()
 export class AppService {
   private WORDART_INDEX = random(env.WORDART_IMAGE_URLS.split('|').length);
-  private readonly services = [
+  private readonly WORDART_SERVICES = [
     'favourites',
     'followers',
     'friends',
@@ -26,210 +36,246 @@ export class AppService {
   constructor(
     private readonly amqpService: AmqpService,
     @Inject(CACHE_MANAGER) private readonly cacheManager,
-    @Inject('TWITTER') private readonly twitter,
+    // private readonly messageService: MessageService,
+    @InjectModel(modelTokens.tweets)
+    private readonly tweetsModel: Model<tweetsModel>,
+    @InjectModel(modelTokens.users)
+    private readonly usersModel: Model<usersModel>,
   ) {}
 
-  // twitter service handler
+  // twitter handler
   @Cron('0 0,10,20,30,40,50 * * * *')
   async update() {
-    // pick twitter instance
+    const {
+      _id,
+      access_token,
+      access_token_secret,
+    } = await this.usersModel.findOne(
+      {
+        access_token: { $exists: true },
+        access_token_secret: { $exists: true },
+        boolean: { $ne: true },
+      },
+      {
+        _id: 1,
+        access_token: 1,
+        access_token_secret: 1,
+        access_token_validated_at: 1,
+      },
+      { sort: { access_token_validated_at: 'desc' } },
+    );
 
-    for (let i = 0, maxId; i < 30; i++) {
-      const query: search_req = {
-        count: 100,
-        lang: 'ml',
-        q: '*',
-        result_type: 'recent',
-        tweet_mode: 'extended',
-      };
+    if (_id) {
+      await this.usersModel.updateOne(
+        { _id },
+        { $set: { access_token_validated_at: moment().toDate() } },
+      );
 
-      // limit 100 & skip till maxId
-      if (maxId) query.max_id = maxId;
+      const twitter = new twit({
+        access_token,
+        access_token_secret,
+        consumer_key: env.TWITTER_CONSUMER_KEY,
+        consumer_secret: env.TWITTER_CONSUMER_SECRET,
+        strictSSL: true,
+        timeout_ms: 60 * 1000,
+      });
 
-      const tweets: search_res = await this.twitter.get('search/tweets', query);
+      try {
+        // account/verify_credentials
+        await twitter.get('account/verify_credentials', {
+          skip_status: true,
+        });
+      } catch (error) {
+        Logger.error(
+          { _id, error },
+          'account/verify_credentials',
+          'AppService/update',
+        );
+        await this.usersModel.updateOne({ _id }, { $set: { blocked: true } }); // block & recursive next
+        return this.update();
+      }
 
-      // break if no status
-      if (!tweets.data.statuses.length) break;
+      for (let i = 0, maxId; i < 30; i++) {
+        const query: search_req = {
+          count: 100,
+          lang: 'ml',
+          q: '*',
+          result_type: 'recent',
+          tweet_mode: 'extended',
+        };
 
-      // ascending sort
-      const statuses = sortBy(tweets.data.statuses, [
-        item =>
-          `${moment(item.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).format(
-            'x',
-          )}.${item.id_str}`,
-      ]);
+        // limit 100 & skip till maxId
+        if (maxId) query.max_id = maxId;
 
-      // set maxId for next iteration
-      maxId = BigInt(statuses[0].id_str)
-        .subtract(1)
-        .toString();
+        const tweets: search_res = await twitter.get('search/tweets', query);
 
-      // new tweets counter
-      let newTweets = 0;
+        // break if no status
+        if (!tweets.data.statuses.length) break;
 
-      for (const status of statuses) {
-        const created_at = +moment(status.user.created_at, [
-          'ddd MMM D HH:mm:ss ZZ YYYY',
-        ]).format('x');
-        const tweeted_at = +moment(status.created_at, [
-          'ddd MMM D HH:mm:ss ZZ YYYY',
-        ]).format('x');
+        // ascending sort
+        const statuses = sortBy(tweets.data.statuses, [
+          item =>
+            `${moment(item.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']).format(
+              'x',
+            )}.${item.id_str}`,
+        ]);
 
-        const user: userInterface = { created_at, tweeted_at };
+        // set maxId for next iteration
+        maxId = BigInt(statuses[0].id_str)
+          .subtract(1)
+          .toString();
 
-        user.favourites = status.user.favourites_count || null;
-        user.followers = status.user.followers_count || null;
-        user.friends = status.user.friends_count || null;
-        user.lists = status.user.listed_count || null;
-        user.tweets = status.user.statuses_count || null;
+        // new tweets counter
+        let newTweets = 0;
 
-        const userRef = db.ref(`users/${status.user.screen_name}`);
-        const userRefVal = (await userRef.once('value')).val();
+        for (const status of statuses) {
+          const created_at = moment(status.user.created_at, [
+            'ddd MMM D HH:mm:ss ZZ YYYY',
+          ]).toDate();
+          const tweeted_at = moment(status.created_at, [
+            'ddd MMM D HH:mm:ss ZZ YYYY',
+          ]).toDate();
 
-        if (userRefVal) {
-          if (moment(tweeted_at).isAfter(userRefVal.tweeted_at)) {
-            user.last_tweeted_at_frequency = moment
-              .duration(moment(tweeted_at).diff(userRefVal.tweeted_at))
+          const $set: { [key: string]: any } = { created_at, tweeted_at };
+          const $unset: { [key: string]: any } = {};
+
+          // favourites
+          if (status.user.favourites_count)
+            $set.favourites = status.user.favourites_count;
+          else $unset.favourites = true;
+
+          // followers
+          if (status.user.followers_count)
+            $set.followers = status.user.followers_count;
+          else $unset.followers = true;
+
+          // friends
+          if (status.user.friends_count)
+            $set.friends = status.user.friends_count;
+          else $unset.friends = true;
+
+          // lists
+          if (status.user.listed_count) $set.lists = status.user.listed_count;
+          else $unset.lists = true;
+
+          // tweets
+          if (status.user.statuses_count)
+            $set.tweets = status.user.statuses_count;
+          else $unset.tweets = true;
+
+          const user = await this.usersModel.findOne({
+            _id: status.user.screen_name,
+          });
+
+          if (user && moment(tweeted_at).isAfter(user.tweeted_at)) {
+            $set.last_tweeted_at_frequency = moment
+              .duration(moment(tweeted_at).diff(user.tweeted_at))
               .asDays();
 
             // average favourites per day
             if (
-              userRefVal.favourites &&
-              status.user.favourites_count != userRefVal.favourites
+              user.favourites &&
+              status.user.favourites_count != user.favourites
             )
-              user.last_favourites_average =
-                (status.user.favourites_count - userRefVal.favourites) /
-                user.last_tweeted_at_frequency;
+              $set.last_favourites_average =
+                (status.user.favourites_count - user.favourites) /
+                $set.last_tweeted_at_frequency;
 
             // average followers per day
-            if (
-              userRefVal.followers &&
-              status.user.followers_count != userRefVal.followers
-            )
-              user.last_followers_average =
-                (status.user.followers_count - userRefVal.followers) /
-                user.last_tweeted_at_frequency;
+            if (user.followers && status.user.followers_count != user.followers)
+              $set.last_followers_average =
+                (status.user.followers_count - user.followers) /
+                $set.last_tweeted_at_frequency;
 
             // average friends per day
-            if (
-              userRefVal.friends &&
-              status.user.friends_count != userRefVal.friends
-            )
-              user.last_friends_average =
-                (status.user.friends_count - userRefVal.friends) /
-                user.last_tweeted_at_frequency;
+            if (user.friends && status.user.friends_count != user.friends)
+              $set.last_friends_average =
+                (status.user.friends_count - user.friends) /
+                $set.last_tweeted_at_frequency;
 
             // average lists per day
-            if (
-              userRefVal.lists &&
-              status.user.listed_count != userRefVal.lists
-            )
-              user.last_lists_average =
-                (status.user.listed_count - userRefVal.lists) /
-                user.last_tweeted_at_frequency;
-
-            if (!isEqual(user, userRefVal)) userRef.update(user);
+            if (user.lists && status.user.listed_count != user.lists)
+              $set.last_lists_average =
+                (status.user.listed_count - user.lists) /
+                $set.last_tweeted_at_frequency;
           }
-        } else {
-          userRef.set(user);
 
-          // update total users count
-          await db.ref(`users_count`).transaction(count => (count || 0) + 1);
-        }
-
-        if (env.ENV == 'development')
           Logger.log(
-            { i: i + 1, [status.user.screen_name]: user },
+            { i: i + 1, [status.user.screen_name]: { ...$set } },
             'AppService/update',
           );
 
-        // publish to RxJS stream
+          // upsert
+          await this.usersModel.updateOne(
+            { _id: status.user.screen_name },
+            { $set, $unset },
+            { upsert: true },
+          );
 
-        const tweetRef = db.ref(`tweets/${status.id_str}`);
-        const tweetRefVal = (await tweetRef.once('value')).val();
+          // publish to RxJS message stream
+          // this.messageService.addMessage(status);
 
-        if (!tweetRefVal) {
-          tweetRef.set(tweeted_at);
-          newTweets++;
+          const tweet = await this.tweetsModel.findOne({
+            _id: status.id_str,
+          });
+
+          if (!tweet) {
+            await new this.tweetsModel({ _id: status.id_str }).save();
+            newTweets++;
+          }
         }
+
+        // no newTweets break
+        if (!newTweets) break;
+
+        // wait before next iteration
+        await new Promise(r => setTimeout(r, 1000 * 10));
       }
 
-      // no newTweets break
-      if (!newTweets) break;
+      const thresholdTweet = await this.tweetsModel.findOne(
+        {},
+        { _id: 1 },
+        { skip: 1000, sort: { _id: 'desc' } },
+      );
 
-      // wait before next iteration
-      await new Promise(r => setTimeout(r, 1000 * 10));
-    }
+      if (thresholdTweet)
+        await this.tweetsModel.deleteMany({
+          _id: { $lte: thresholdTweet._id },
+        });
 
-    // latest 999 tweets collection
-    const tweetsThresholdRef = db.ref('tweets');
-    const tweetsThresholdRefVal = (
-      await tweetsThresholdRef
-        .orderByKey()
-        .limitToLast(1000)
-        .once('value')
-    ).val();
-    (
-      await tweetsThresholdRef
-        .orderByKey()
-        .endAt(Object.keys(tweetsThresholdRefVal)[0])
-        .once('value')
-    ).forEach(item => {
-      tweetsThresholdRef.child(item.key).remove();
-    });
-
-    return true;
+      return true;
+    } else throw new NotFoundException();
   }
 
   // populate wordart in cache
   @Cron('30 2,12,22,32,42,52 * * * *')
   async _wordart(key: string = '') {
-    let ERROR_THRESHOLD = 10;
+    if (!key)
+      for (const service of this.WORDART_SERVICES) await this._wordart(service);
 
-    if (-1 < this.services.indexOf(key)) {
-      let startAt: number;
-      const usersRef = db.ref('users');
+    if (-1 < this.WORDART_SERVICES.indexOf(key)) {
+      const data = { startAt: moment().toDate(), tweeters: [], wordArt: {} };
 
-      // set startAt 10 minutes before
-      (
-        await usersRef
-          .orderByChild('tweeted_at')
-          .limitToLast(1)
-          .once('value')
-      ).forEach(user => {
-        startAt = +moment(user.val().tweeted_at)
-          .subtract(10, 'minutes')
-          .format('x');
-      });
+      // iterate max 30 times & at-least 10 tweeters
+      for (let i = 0; data.tweeters.length < 10 && i < 30; i++) {
+        data.startAt = moment(data.startAt)
+          .subtract((i + 1) * 10, 'minutes')
+          .toDate();
 
-      // data format in each key
-      const data = { startAt, tweeters: [], wordArt: {} };
+        const prop = `last_${key}_${
+          key == 'tweeted_at' ? 'frequency' : 'average'
+        }`;
 
-      // iterate max 10 times at-least 10 tweeters
-      for (let i = 0; data.tweeters.length < 10 && i < 10; i++) {
-        // subtract 10 minutes except 1'st iteration
-        if (i)
-          data.startAt = +moment(data.startAt)
-            .subtract(i * 10, 'minutes')
-            .format('x');
+        // dynamic projection
+        const users = await this.usersModel.find(
+          { tweeted_at: { $gte: data.startAt } },
+          { _id: 1, [prop]: 1 },
+          { sort: { tweeted_at: 'desc' } },
+        );
 
-        (
-          await usersRef
-            .orderByChild('tweeted_at')
-            .startAt(data.startAt)
-            .once('value')
-        ).forEach(user => {
-          const value = user.val()[
-            `last_${key}_${key == 'tweeted_at' ? 'frequency' : 'average'}`
-          ];
-
-          // positive tweeters
-          if (0 < value && !find(data.tweeters, { key: user.key }))
-            data.tweeters.push({
-              key: user.key,
-              value: Math.ceil(value),
-            });
-        });
+        for (const user of users)
+          if (0 < user[prop] && !find(data.tweeters, { key: user._id }))
+            data.tweeters.push({ key: user._id, value: Math.ceil(user[prop]) });
       }
 
       if (data.tweeters.length)
@@ -259,26 +305,22 @@ export class AppService {
               const json = JSON.parse(content);
 
               Logger.log(
-                { statusCode: json.statusCode, statusText: json.statusText },
+                pick(json, ['statusCode', 'statusText']),
                 `AppService/${key}`,
               );
 
               if (json.statusCode == 200) {
                 data.wordArt = json.response;
 
-                // put it in cache
                 this.cacheManager.set(
                   '_wordart',
                   {
                     ...((await this.cacheManager.get('_wordart')) || {}),
                     [key]: data,
                   },
-                  { ttl: 0 },
+                  { ttl: 0 }, // infinitely
                 );
-              } else {
-                // conditional retry
-                if (0 < ERROR_THRESHOLD--) await this._wordart(key);
-              }
+              } else await this._wordart(key);
             } else
               Logger.error(
                 content,
@@ -287,28 +329,24 @@ export class AppService {
               );
           })
           .catch(e => Logger.error(e, e.message, `AppService/${key}`));
-    } else for (const service of this.services) await this._wordart(service);
+    }
 
-    return true;
+    return (await this.cacheManager.get('_wordart')) || {};
   }
 
   // wordart route handler
   async wordart(key: string = '') {
+    // custom cache handler
     let _wordart = await this.cacheManager.get('_wordart');
+    if (!_wordart) _wordart = await this._wordart();
 
-    // populate cache
-    if (!_wordart) {
-      await this._wordart();
-      _wordart = await this.cacheManager.get('_wordart');
-    }
-
-    if (key && -1 < this.services.indexOf(key) && _wordart[key])
+    if (key && -1 < this.WORDART_SERVICES.indexOf(key) && _wordart[key])
       return _wordart[key].wordArt;
     else {
       const json = {};
 
-      // meta data response
-      each(pick(_wordart, this.services), (value, key) => {
+      // metadata response
+      each(pick(_wordart, this.WORDART_SERVICES), (value, key) => {
         json[key] = {
           hits: value.tweeters.map(tweeter => tweeter.key),
           startAt: value.startAt,
@@ -320,26 +358,21 @@ export class AppService {
   }
 
   // search route handler
-  async search(key: string = '') {
-    const hits = [];
-    const total = (await db.ref('users_count').once('value')).val();
-    const usersRef = db.ref('users');
+  async search(query: string = '') {
+    const _id = new RegExp(query, 'i');
 
-    (key
-      ? await usersRef
-          .orderByKey()
-          .startAt(key)
-          .endAt(`${key}\uf8ff`)
-          .limitToFirst(10)
-          .once('value')
-      : await usersRef
-          .orderByChild('tweeted_at')
-          .limitToLast(10)
-          .once('value')
-    ).forEach(snapshot => {
-      hits.push({ ...snapshot.val(), _id: snapshot.key });
-    });
+    const hits = await this.usersModel.find(
+      { _id },
+      { _id: 1, tweeted_at: 1 },
+      { limit: 10, sort: { tweeted_at: 'desc' } },
+    );
 
-    return { hits, total };
+    return {
+      hits: hits.map(hit => hit._id),
+      total:
+        hits.length < 10
+          ? hits.length
+          : await this.usersModel.countDocuments({ _id }),
+    };
   }
 }
