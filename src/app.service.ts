@@ -63,7 +63,7 @@ export class AppService {
         access_token_secret: 1,
         access_token_validated_at: 1,
       },
-      { sort: { access_token_validated_at: 'desc' } },
+      { sort: { access_token_validated_at: 'asc' } },
     );
 
     if (_id) {
