@@ -6,7 +6,7 @@ export const usersSchema = new Schema({
   access_token_secret: String,
   access_token_validated_at: Date,
   blocked: Boolean,
-  created_at: { required: true, type: Date },
+  created_at: Date,
   favourites: Number,
   followers: Number,
   friends: Number,
@@ -17,6 +17,6 @@ export const usersSchema = new Schema({
   last_tweeted_at_frequency: Number,
   lists: Number,
   roles: [String],
-  tweeted_at: { required: true, type: Date },
+  tweeted_at: Date,
   tweets: Number,
 });

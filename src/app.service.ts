@@ -36,6 +36,7 @@ export class AppService {
   constructor(
     private readonly amqpService: AmqpService,
     @Inject(CACHE_MANAGER) private readonly cacheManager,
+    private readonly logger: Logger,
     // private readonly messageService: MessageService,
     @InjectModel(modelTokens.tweets)
     private readonly tweetsModel: Model<tweetsModel>,
@@ -86,7 +87,7 @@ export class AppService {
           skip_status: true,
         });
       } catch (error) {
-        Logger.error(
+        this.logger.error(
           { _id, error },
           'account/verify_credentials',
           'AppService/update',
@@ -200,7 +201,7 @@ export class AppService {
                 $set.last_tweeted_at_frequency;
           }
 
-          Logger.log(
+          this.logger.log(
             { i: i + 1, [status.user.screen_name]: { ...$set } },
             'AppService/update',
           );
@@ -278,57 +279,64 @@ export class AppService {
             data.tweeters.push({ key: user._id, value: Math.ceil(user[prop]) });
       }
 
-      if (data.tweeters.length)
-        this.amqpService
-          .request(
-            {},
-            {
-              sendOpts: {
-                headers: {
-                  // randomizing images
-                  image: env.WORDART_IMAGE_URLS.split('|')[
-                    this.WORDART_INDEX++ %
-                      env.WORDART_IMAGE_URLS.split('|').length
-                  ],
-                  // words in csv format
-                  words: data.tweeters
-                    .map(item => `${item.key};${item.value}`)
-                    .join('\n'),
+      if (data.tweeters.length) {
+        let content;
+
+        try {
+          content = (
+            await this.amqpService.request(
+              {},
+              {
+                sendOpts: {
+                  headers: {
+                    // randomizing images
+                    image: env.WORDART_IMAGE_URLS.split('|')[
+                      this.WORDART_INDEX++ %
+                        env.WORDART_IMAGE_URLS.split('|').length
+                    ],
+                    // words in csv format
+                    words: data.tweeters
+                      .map(item => `${item.key};${item.value}`)
+                      .join('\n'),
+                  },
                 },
               },
-            },
-          )
-          .then(async r => {
-            const content = r.content.toString();
+            )
+          ).content.toString();
+        } catch (e) {
+          this.logger.error(e, e.message, `AppService/${key}`);
+        }
 
-            if (isJSON(content)) {
-              const json = JSON.parse(content);
+        if (content) {
+          if (isJSON(content)) {
+            const json = JSON.parse(content);
 
-              Logger.log(
-                pick(json, ['statusCode', 'statusText']),
-                `AppService/${key}`,
+            this.logger.log(
+              pick(json, ['statusCode', 'statusText']),
+              `AppService/${key}`,
+            );
+
+            if (json.statusCode == 200) {
+              data.wordArt = json.response;
+
+              // custom caching
+              this.cacheManager.set(
+                '_wordart',
+                {
+                  ...((await this.cacheManager.get('_wordart')) || {}),
+                  [key]: data,
+                },
+                { ttl: 0 }, // infinitely
               );
-
-              if (json.statusCode == 200) {
-                data.wordArt = json.response;
-
-                this.cacheManager.set(
-                  '_wordart',
-                  {
-                    ...((await this.cacheManager.get('_wordart')) || {}),
-                    [key]: data,
-                  },
-                  { ttl: 0 }, // infinitely
-                );
-              } else await this._wordart(key);
-            } else
-              Logger.error(
-                content,
-                'invalid JSON response',
-                `AppService/${key}`,
-              );
-          })
-          .catch(e => Logger.error(e, e.message, `AppService/${key}`));
+            } else await this._wordart(key);
+          } else
+            this.logger.error(
+              content,
+              'invalid JSON response.content',
+              `AppService/${key}`,
+            );
+        }
+      }
     }
 
     return (await this.cacheManager.get('_wordart')) || {};

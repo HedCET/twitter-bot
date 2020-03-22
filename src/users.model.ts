@@ -6,7 +6,7 @@ export interface usersModel extends Document {
   access_token_secret?: String;
   access_token_validated_at?: Date;
   blocked?: Boolean;
-  created_at: Date;
+  created_at?: Date;
   favourites?: Number;
   followers?: Number;
   friends?: Number;
@@ -17,6 +17,6 @@ export interface usersModel extends Document {
   last_tweeted_at_frequency?: Number;
   lists?: Number;
   roles?: String[];
-  tweeted_at: Date;
+  tweeted_at?: Date;
   tweets?: Number;
 }

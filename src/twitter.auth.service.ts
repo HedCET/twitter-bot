@@ -1,11 +1,19 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectModel } from '@nestjs/mongoose';
+import moment = require('moment');
+import { Model } from 'mongoose';
+
+import { modelTokens } from './db.models';
+import { usersModel } from './users.model';
 
 @Injectable()
 export class TwitterAuthService {
   constructor(
     private readonly jwtService: JwtService,
     @Inject('TWITTER_AUTH') private readonly twitterAuth,
+    @InjectModel(modelTokens.users)
+    private readonly usersModel: Model<usersModel>,
   ) {}
 
   async twitterRequestToken() {
@@ -42,7 +50,21 @@ export class TwitterAuthService {
           ) => {
             if (error) reject(error);
             else {
-              // db update
+              await this.usersModel.updateOne(
+                { _id: r.screen_name },
+                {
+                  $addToSet: {
+                    roles: 'user',
+                  },
+                  $set: {
+                    acess_token: acessToken,
+                    acess_token_secret: acessTokenSecret,
+                    access_token_validated_at: moment().toDate(),
+                  },
+                  $unset: { blocked: true },
+                },
+                { upsert: true },
+              );
 
               resolve({
                 accessToken: this.jwtService.sign({ _id: r.screen_name }),

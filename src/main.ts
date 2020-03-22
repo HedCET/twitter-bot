@@ -2,9 +2,9 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as compression from 'compression';
-import * as cookieSession from 'cookie-session';
-import * as cookieParser from 'cookie-parser';
-import * as csurf from 'csurf';
+// import * as cookieSession from 'cookie-session';
+// import * as cookieParser from 'cookie-parser';
+// import * as csurf from 'csurf';
 import * as expressRateLimit from 'express-rate-limit';
 import * as helmet from 'helmet';
 
@@ -15,7 +15,7 @@ import { env } from './env.validations';
 const bootstrap = async () => {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger:
-      env.ENV == 'development'
+      env.NODE_ENV == 'development'
         ? ['debug', 'error', 'log', 'verbose', 'warn']
         : ['error', 'warn'],
   });
@@ -24,14 +24,14 @@ const bootstrap = async () => {
 
   app.use(helmet());
   app.set('trust proxy', 1);
-  app.use(
-    cookieSession({
-      name: 'session',
-      secret: env.SECRET,
-    }),
-  );
-  app.use(cookieParser());
-  app.use(csurf({ cookie: true }));
+  // app.use(
+  //   cookieSession({
+  //     name: 'session',
+  //     secret: env.SECRET,
+  //   }),
+  // );
+  // app.use(cookieParser());
+  // app.use(csurf({ cookie: true }));
   // app.use((req, res, next) => {
   //   const _csurf = csurf({ cookie: true });
   //   if (-1 < ['/path'].indexOf(req.url)) return next();
@@ -48,7 +48,7 @@ const bootstrap = async () => {
   // app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(
     new ValidationPipe({
-      disableErrorMessages: env.ENV == 'development' ? false : true,
+      disableErrorMessages: env.NODE_ENV == 'development' ? false : true,
       forbidNonWhitelisted: true,
       forbidUnknownValues: true,
       transform: true,

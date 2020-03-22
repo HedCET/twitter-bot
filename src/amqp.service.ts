@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { connection } from 'amqplib';
-import { checkQueue, /* checkReplyQueue, */ reply, request } from 'amqplib-rpc';
+import { checkQueue, reply, request } from 'amqplib-rpc';
 
 import { env } from './env.validations';
 
@@ -9,7 +9,10 @@ export class AmqpService {
   private consumerChannel;
   private publisherChannel;
 
-  constructor(@Inject('AMQP') private readonly amqp: connection) {}
+  constructor(
+    @Inject('AMQP') private readonly amqp: connection,
+    private readonly logger: Logger,
+  ) {}
 
   async ack(message) {
     if (this.consumerChannel) return await this.consumerChannel.ack(message);
@@ -22,13 +25,7 @@ export class AmqpService {
   ) {
     if (!this.publisherChannel)
       this.publisherChannel = await this.amqp.createChannel();
-    /* if (await checkReplyQueue(this.amqp, message)) */ return await reply(
-      this.publisherChannel,
-      message,
-      payload,
-      options,
-    );
-    // Logger.error(message.content.toString(), 'reply.failed', 'AmqpService');
+    return await reply(this.publisherChannel, message, payload, options);
   }
 
   async replyAck(
@@ -44,6 +41,6 @@ export class AmqpService {
   async request(payload: any, options: { [key: string]: any } = {}) {
     if (await checkQueue(this.amqp, env.AMQP_QUEUE))
       return await request(this.amqp, env.AMQP_QUEUE, payload, options);
-    Logger.error(JSON.stringify(payload), 'request.failed', 'AmqpService');
+    this.logger.error(payload, 'failed', 'AmqpService/request');
   }
 }

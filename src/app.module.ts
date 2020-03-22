@@ -1,4 +1,4 @@
-import { CacheModule, Global, Module } from '@nestjs/common';
+import { CacheModule, Global, Module, Logger } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -39,6 +39,7 @@ import { twitterProviders } from './twitter.providers';
     AmqpService,
     AppService,
     JwtStrategy,
+    Logger,
     MessageService,
     TwitterAuthService,
   ],

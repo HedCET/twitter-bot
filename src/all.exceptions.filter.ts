@@ -4,7 +4,6 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 
 @Catch()
@@ -14,8 +13,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     // const request = ctx.getRequest();
     const response = ctx.getResponse();
-
-    Logger.log(exception, 'AllExceptionsFilter');
 
     if (exception instanceof HttpException) {
       response.status(exception.getStatus()).json(exception.getResponse());
