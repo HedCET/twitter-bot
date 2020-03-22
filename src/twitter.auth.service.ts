@@ -41,8 +41,8 @@ export class TwitterAuthService {
           verifier,
           async (
             error,
-            acessToken,
-            acessTokenSecret,
+            accessToken,
+            accessTokenSecret,
             r: {
               screen_name: string;
               user_id: string;
@@ -57,8 +57,8 @@ export class TwitterAuthService {
                     roles: 'user',
                   },
                   $set: {
-                    acess_token: acessToken,
-                    acess_token_secret: acessTokenSecret,
+                    access_token: accessToken,
+                    access_token_secret: accessTokenSecret,
                     access_token_validated_at: moment().toDate(),
                   },
                   $unset: { blocked: true },
