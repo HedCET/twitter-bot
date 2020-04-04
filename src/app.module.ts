@@ -12,6 +12,7 @@ import { dbModels } from './db.models';
 import { env } from './env.validations';
 import { JwtStrategy } from './jwt.strategy';
 import { MessageService } from './message.service';
+import { ScriptService } from './script.service';
 import { TwitterAuthController } from './twitter.auth.controller';
 import { TwitterAuthService } from './twitter.auth.service';
 import { twitterProviders } from './twitter.providers';
@@ -41,6 +42,7 @@ import { twitterProviders } from './twitter.providers';
     JwtStrategy,
     Logger,
     MessageService,
+    ScriptService,
     TwitterAuthService,
   ],
 })

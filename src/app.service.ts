@@ -17,7 +17,7 @@ import { isJSON } from 'validator';
 import { AmqpService } from './amqp.service';
 import { modelTokens } from './db.models';
 import { env } from './env.validations';
-// import { MessageService } from './message.service';
+import { MessageService } from './message.service';
 import { tweetsModel } from './tweets.model';
 import { search_req, search_res } from './twitter.interface';
 import { usersModel } from './users.model';
@@ -37,7 +37,7 @@ export class AppService {
     private readonly amqpService: AmqpService,
     @Inject(CACHE_MANAGER) private readonly cacheManager,
     private readonly logger: Logger,
-    // private readonly messageService: MessageService,
+    private readonly messageService: MessageService,
     @InjectModel(modelTokens.tweets)
     private readonly tweetsModel: Model<tweetsModel>,
     @InjectModel(modelTokens.users)
@@ -55,18 +55,18 @@ export class AppService {
       {
         access_token: { $exists: true },
         access_token_secret: { $exists: true },
-        boolean: { $ne: true },
+        blocked: { $ne: true },
       },
       {
         _id: 1,
         access_token: 1,
         access_token_secret: 1,
-        access_token_validated_at: 1,
       },
       { sort: { access_token_validated_at: 'asc' } },
     );
 
     if (_id) {
+      // update access_token_validated_at only here in entire repo
       await this.usersModel.updateOne(
         { _id },
         { $set: { access_token_validated_at: moment().toDate() } },
@@ -92,7 +92,7 @@ export class AppService {
           'account/verify_credentials',
           'AppService/update',
         );
-        await this.usersModel.updateOne({ _id }, { $set: { blocked: true } }); // block & recursive next
+        await this.usersModel.updateOne({ _id }, { $set: { blocked: true } }); // block & recursive
         return this.update();
       }
 
@@ -214,7 +214,7 @@ export class AppService {
           );
 
           // publish to RxJS message stream
-          // this.messageService.addMessage(status);
+          this.messageService.addMessage(status);
 
           const tweet = await this.tweetsModel.findOne({
             _id: status.id_str,
@@ -249,7 +249,7 @@ export class AppService {
   }
 
   // populate wordart in cache
-  @Cron('30 2,12,22,32,42,52 * * * *')
+  @Cron('0 5,15,25,35,45,55 * * * *')
   async _wordart(key: string = '') {
     if (!key)
       for (const service of this.WORDART_SERVICES) await this._wordart(service);
