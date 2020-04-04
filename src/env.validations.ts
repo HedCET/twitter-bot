@@ -5,7 +5,7 @@ import { keys, pick } from 'lodash';
 import * as path from 'path';
 
 const schema = {
-  AMQP_QUEUE: joi.string().required(),
+  AMQP_QUEUE_NAME: joi.string().required(),
   AMQP_URL: joi.string().required(),
   MONGO_URL: joi.string().required(),
   NODE_ENV: joi.string().default('development'),

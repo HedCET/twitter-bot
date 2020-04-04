@@ -39,8 +39,8 @@ export class AmqpService {
   }
 
   async request(payload: any, options: { [key: string]: any } = {}) {
-    if (await checkQueue(this.amqp, env.AMQP_QUEUE))
-      return await request(this.amqp, env.AMQP_QUEUE, payload, options);
+    if (await checkQueue(this.amqp, env.AMQP_QUEUE_NAME))
+      return await request(this.amqp, env.AMQP_QUEUE_NAME, payload, options);
     this.logger.error(payload, 'failed', 'AmqpService/request');
   }
 }
