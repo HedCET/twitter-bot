@@ -59,7 +59,6 @@ export class TwitterAuthService {
                   $set: {
                     access_token: accessToken,
                     access_token_secret: accessTokenSecret,
-                    access_token_validated_at: moment().toDate(),
                   },
                   $unset: { blocked: true },
                 },
