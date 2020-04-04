@@ -7,7 +7,7 @@ module.exports = async ({ tweeter, status, twitter, user }) => {
       'statuses/retweet',
       `${status.user.screen_name}/${status.id_str}`,
     );
-    // await new Promise(r => setTimeout(r, 1000 * 60));
-    // await twitter.post('statuses/retweet', { id: status.id_str });
+    await twitter.post('statuses/retweet', { id: status.id_str });
+    await new Promise(r => setTimeout(r, 1000 * 10));
   }
 };
