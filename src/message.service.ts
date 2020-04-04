@@ -41,11 +41,11 @@ export class MessageService {
       .subscribe(this.update);
   }
 
-  async addMessage(message: search_res_statuses) {
+  addMessage(message: search_res_statuses) {
     this.newMessage.next(message);
   }
 
-  async removeMessage(message: search_res_statuses) {
+  removeMessage(message: search_res_statuses) {
     this.deleteMessage.next(message);
   }
 }

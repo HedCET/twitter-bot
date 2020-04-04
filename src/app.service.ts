@@ -213,9 +213,6 @@ export class AppService {
             { upsert: true },
           );
 
-          // publish to RxJS message stream
-          this.messageService.addMessage(status);
-
           const tweet = await this.tweetsModel.findOne({
             _id: status.id_str,
           });
@@ -223,6 +220,7 @@ export class AppService {
           if (!tweet) {
             await new this.tweetsModel({ _id: status.id_str }).save();
             newTweets++;
+            this.messageService.addMessage(status); // publish to RxJS message stream
           }
         }
 
@@ -236,7 +234,7 @@ export class AppService {
       const thresholdTweet = await this.tweetsModel.findOne(
         {},
         { _id: 1 },
-        { skip: 1000, sort: { _id: 'desc' } },
+        { skip: 100000, sort: { _id: 'desc' } },
       );
 
       if (thresholdTweet)
