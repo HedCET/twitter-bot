@@ -16,6 +16,8 @@ import { ScriptService } from './script.service';
 import { TwitterAuthController } from './twitter.auth.controller';
 import { TwitterAuthService } from './twitter.auth.service';
 import { twitterProviders } from './twitter.providers';
+import { TwitterService } from './twitter.service';
+import { WordartService } from './wordart.service';
 
 @Global()
 @Module({
@@ -44,6 +46,8 @@ import { twitterProviders } from './twitter.providers';
     MessageService,
     ScriptService,
     TwitterAuthService,
+    TwitterService,
+    WordartService,
   ],
 })
 export class AppModule {}
