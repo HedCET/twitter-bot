@@ -25,7 +25,7 @@ export class TwitterService {
     private readonly usersModel: Model<usersModel>,
   ) {}
 
-  // twitter scheduler
+  // collect lang:ml tweets
   @Cron('0 0,10,20,30,40,50 * * * *')
   private async scheduler() {
     const {
