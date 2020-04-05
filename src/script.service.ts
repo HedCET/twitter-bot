@@ -70,9 +70,26 @@ export class ScriptService {
 
             for (const status of statuses) {
               // get tweeter
-              const tweeter = await this.usersModel.findOne({
-                _id: status.user.screen_name,
-              });
+              const tweeter = await this.usersModel.findOne(
+                {
+                  _id: status.user.screen_name,
+                },
+                {
+                  _id: 1,
+                  created_at: 1,
+                  favourites: 1,
+                  followers: 1,
+                  friends: 1,
+                  last_favourites_average: 1,
+                  last_followers_average: 1,
+                  last_friends_average: 1,
+                  last_lists_average: 1,
+                  last_tweeted_at_frequency: 1,
+                  lists: 1,
+                  tweeted_at: 1,
+                  tweets: 1,
+                },
+              );
 
               try {
                 // execute user script

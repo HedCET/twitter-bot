@@ -16,11 +16,10 @@ export class AppService {
   async search(query: string = '') {
     const _id = new RegExp(query, 'i');
 
-    const hits = await this.usersModel.find(
-      { _id },
-      { _id: 1, tweeted_at: 1 },
-      { limit: 10, sort: { tweeted_at: 'desc' } },
-    );
+    const hits = await this.usersModel.find({ _id }, null, {
+      limit: 10,
+      sort: { tweeted_at: 'desc' },
+    });
 
     return {
       hits: hits.map(hit => hit._id),

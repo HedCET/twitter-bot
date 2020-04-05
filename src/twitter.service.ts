@@ -212,11 +212,10 @@ export class TwitterService {
         await new Promise(r => setTimeout(r, 1000 * 10));
       }
 
-      const thresholdTweet = await this.tweetsModel.findOne(
-        {},
-        { _id: 1 },
-        { skip: 100000, sort: { _id: 'desc' } },
-      );
+      const thresholdTweet = await this.tweetsModel.findOne({}, null, {
+        skip: 100000,
+        sort: { _id: 'desc' },
+      });
 
       if (thresholdTweet)
         await this.tweetsModel.deleteMany({
