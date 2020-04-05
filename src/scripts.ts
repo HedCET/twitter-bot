@@ -8,7 +8,7 @@ export const scripts = {
     if (
       tweeter._id != user._id &&
       (!tweeter.last_tweeted_at_frequency ||
-        10 < (tweeter.last_tweeted_at_frequency || 0))
+        30 < (tweeter.last_tweeted_at_frequency || 0))
     ) {
       await twitter.post('statuses/retweet', { id: status.id_str });
       await new Promise(r => setTimeout(r, 1000 * 10)); // delay 10 seconds
