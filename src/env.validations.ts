@@ -24,11 +24,10 @@ const { error, value } = joi.validate(
   {
     ...dotenv.parse(
       fs.existsSync(path.resolve(process.env.ENV_FILEPATH || './.development'))
-        ? fs
-            .readFileSync(
-              path.resolve(process.env.ENV_FILEPATH || './.development'),
-            )
-            .toString()
+        ? fs.readFileSync(
+            path.resolve(process.env.ENV_FILEPATH || './.development'),
+            { encoding: 'utf8' },
+          )
         : '',
     ),
     ...pick(process.env, keys(schema)),
