@@ -69,8 +69,8 @@ export class TwitterService {
         });
       } catch (error) {
         this.logger.error(
-          { _id, error },
-          'account/verify_credentials',
+          error.message || error,
+          `account/verify_credentials/${_id}`,
           'TwitterService/scheduler',
         );
         await this.usersModel.updateOne({ _id }, { $set: { blocked: true } }); // block & recursive
@@ -224,5 +224,16 @@ export class TwitterService {
 
       return true;
     }
+
+    const usersModelStats = await this.usersModel.collection.stats();
+
+    if (384 * 1024 * 1024 < usersModelStats.storageSize)
+      await this.usersModel.deleteMany({
+        tweeted_at: {
+          $lt: moment()
+            .subtract(1, 'years')
+            .toDate(),
+        },
+      });
   }
 }

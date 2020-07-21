@@ -57,7 +57,7 @@ export class ScriptService {
               });
             } catch (error) {
               this.logger.error(
-                error,
+                error.message || error,
                 'account/verify_credentials',
                 `ScriptService/${user._id}`,
               );
@@ -96,7 +96,7 @@ export class ScriptService {
                 await scripts[user._id]({ tweeter, status, twitter, user });
               } catch (error) {
                 this.logger.error(
-                  error,
+                  error.message || error,
                   `${status.user.screen_name}/${status.id_str}`,
                   `scripts/${user._id}`,
                 );
