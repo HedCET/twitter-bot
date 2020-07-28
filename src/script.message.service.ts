@@ -11,7 +11,7 @@ interface MessageOperation {
 }
 
 @Injectable()
-export class MessageService {
+export class ScriptMessageService {
   private deleteMessage = new Subject<search_res_statuses>();
   private insert = new Subject<search_res_statuses>();
   messages: Observable<search_res_statuses[]>;

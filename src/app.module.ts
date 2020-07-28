@@ -11,7 +11,7 @@ import { AppService } from './app.service';
 import { dbModels } from './db.models';
 import { env } from './env.validations';
 import { JwtStrategy } from './jwt.strategy';
-import { MessageService } from './message.service';
+import { ScriptMessageService } from './script.message.service';
 import { ScriptService } from './script.service';
 import { TwitterAuthController } from './twitter.auth.controller';
 import { TwitterAuthService } from './twitter.auth.service';
@@ -43,7 +43,7 @@ import { WordartService } from './wordart.service';
     AppService,
     JwtStrategy,
     Logger,
-    MessageService,
+    ScriptMessageService,
     ScriptService,
     TwitterAuthService,
     TwitterService,

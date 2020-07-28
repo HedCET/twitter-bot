@@ -6,7 +6,7 @@ import * as twit from 'twit';
 
 import { modelTokens } from './db.models';
 import { env } from './env.validations';
-import { MessageService } from './message.service';
+import { ScriptMessageService } from './script.message.service';
 import { scripts } from './scripts';
 import { usersModel } from './users.model';
 
@@ -14,19 +14,19 @@ import { usersModel } from './users.model';
 export class ScriptService {
   constructor(
     private readonly logger: Logger,
-    private readonly messageService: MessageService,
+    private readonly scriptMessageService: ScriptMessageService,
     @InjectModel(modelTokens.users)
     private readonly usersModel: Model<usersModel>,
   ) {
     this.logger.log(Object.keys(scripts), 'ScriptService/scripts');
 
     // script executer
-    this.messageService.messages
+    this.scriptMessageService.messages
       .pipe(throttleTime(1000 * 60))
       .subscribe(async statuses => {
         if (statuses.length) {
           for (const status of statuses)
-            await this.messageService.removeMessage(status);
+            await this.scriptMessageService.removeMessage(status);
 
           // get users
           const users = await this.usersModel.find(

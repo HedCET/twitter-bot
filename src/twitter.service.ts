@@ -9,7 +9,7 @@ import * as twit from 'twit';
 
 import { modelTokens } from './db.models';
 import { env } from './env.validations';
-import { MessageService } from './message.service';
+import { ScriptMessageService } from './script.message.service';
 import { tweetsModel } from './tweets.model';
 import { search_req, search_res } from './twitter.interface';
 import { usersModel } from './users.model';
@@ -18,7 +18,7 @@ import { usersModel } from './users.model';
 export class TwitterService {
   constructor(
     private readonly logger: Logger,
-    private readonly messageService: MessageService,
+    private readonly scriptMessageService: ScriptMessageService,
     @InjectModel(modelTokens.tweets)
     private readonly tweetsModel: Model<tweetsModel>,
     @InjectModel(modelTokens.users)
@@ -201,7 +201,7 @@ export class TwitterService {
           if (!tweet) {
             await new this.tweetsModel({ _id: status.id_str }).save();
             newTweets++;
-            this.messageService.addMessage(status); // publish to RxJS message stream
+            this.scriptMessageService.addMessage(status); // publish to RxJS message stream
           }
         }
 
