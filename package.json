@@ -29,6 +29,7 @@
     "mkdirp": "^0.5.5",
     "moment": "^2.27.0",
     "mongoose": "^5.9.26",
+    "neo4j-driver": "^4.1.1",
     "oauth": "^0.9.15",
     "passport": "^0.4.1",
     "passport-jwt": "^4.0.0",

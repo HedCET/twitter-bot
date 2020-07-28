@@ -9,8 +9,11 @@ import { AmqpService } from './amqp.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { dbModels } from './db.models';
+import { dbProviders } from './db.providers';
 import { env } from './env.validations';
 import { JwtStrategy } from './jwt.strategy';
+import { RoughRecordMessageService } from './rough.record.message.service';
+import { RoughRecordService } from './rough.record.service';
 import { ScriptMessageService } from './script.message.service';
 import { ScriptService } from './script.service';
 import { TwitterAuthController } from './twitter.auth.controller';
@@ -38,11 +41,14 @@ import { WordartService } from './wordart.service';
   ],
   providers: [
     ...amqpProviders,
+    ...dbProviders,
     ...twitterProviders,
     AmqpService,
     AppService,
     JwtStrategy,
     Logger,
+    RoughRecordMessageService,
+    RoughRecordService,
     ScriptMessageService,
     ScriptService,
     TwitterAuthService,
