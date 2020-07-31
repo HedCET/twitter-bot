@@ -9,7 +9,7 @@ export class AppService {
   // search route handler
   async search(query: string = '') {
     const { records: hits } = await this.neo4jService.read(
-      `MATCH (p:Person)
+      `MATCH (p:nPerson)
       WHERE p.name =~ $query
       RETURN p.name
       ORDER BY p.tweetedAt DESC
@@ -26,7 +26,7 @@ export class AppService {
           ? hits.length
           : (
               await this.neo4jService.read(
-                `MATCH (p:Person)
+                `MATCH (p:nPerson)
                 WHERE p.name =~ $query
                 WITH COUNT(p) AS total
                 RETURN total`,
