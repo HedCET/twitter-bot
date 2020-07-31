@@ -1,14 +1,27 @@
 import neo4j from 'neo4j-driver';
 
+import { env } from './env.validations';
+
 export const dbProviders = [
   {
     provide: 'NEO4J',
     useFactory: async () => {
+      const url = new URL(env.NEO4J_URL);
+
       const driver = neo4j.driver(
-        'bolt://localhost:7687',
-        neo4j.auth.basic('neo4j', 'password'),
+        `${url.protocol}//${url.host}`,
+        neo4j.auth.basic(
+          decodeURIComponent(url.username),
+          decodeURIComponent(url.password),
+        ),
+        {
+          maxConnectionPoolSize: 1000,
+        },
       );
+
+      // verify connectivity
       await driver.verifyConnectivity();
+
       return driver;
     },
   },

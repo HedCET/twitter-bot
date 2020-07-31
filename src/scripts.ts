@@ -1,23 +1,41 @@
 export const scripts = {
-  // tweeter[Object] tweeter refer ./user.model.ts
-  // status[Object] refer https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/intro-to-tweet-json
-  // twitter[Instance] twit instance
-  // user[Object] script executer refer ./user.model.ts
+  // client[Instance] => https://www.npmjs.com/package/twitter-lite
+  // executor[object] | tweeter[Object] =>
+  //  {
+  //    averageFollowers?: Number;
+  //    averageFriends?: Number;
+  //    averageLikes?: Number;
+  //    averageLists?: Number;
+  //    createdAt?: Date;
+  //    followers?: Number;
+  //    friends?: Number;
+  //    likes?: Number;
+  //    lists?: Number;
+  //    name: String;
+  //    tweetedAt?: Date;
+  //    tweetFrequency?: Number;
+  //    tweets?: Number;
+  //  }
+  // status[Object] => https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/intro-to-tweet-json
 
-  async crawlamma({ tweeter, status, twitter, user }) {
+  // https://twitter.com/crawlamma
+  async crawlamma({ client, executor, tweeter, status }) {
     if (
-      tweeter._id != user._id &&
-      (!tweeter.last_tweeted_at_frequency ||
-        30 < (tweeter.last_tweeted_at_frequency || 0))
+      executor.name !== tweeter.name &&
+      (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
     ) {
-      await twitter.post('statuses/retweet', { id: status.id_str });
+      await client.post('statuses/retweet', { id: status.id_str });
       await new Promise(r => setTimeout(r, 1000 * 10)); // delay 10 seconds
     }
   },
 
-  // async kulukulu0033({ tweeter, status, twitter, user }) {
-  //   if (tweeter._id != user._id && status.full_text.match(/സ്വാമിന.*/g)) {
-  //     await twitter.post('statuses/retweet', { id: status.id_str });
+  // https://twitter.com/kulukulu0033
+  // async kulukulu0033({ client, executor, tweeter, status }) {
+  //   if (
+  //     executor.name !== tweeter.name &&
+  //     status.full_text.match(/സ്വാമിന.*/g)
+  //   ) {
+  //     await client.post('statuses/retweet', { id: status.id_str });
   //     await new Promise(r => setTimeout(r, 1000 * 10));
   //   }
   // },

@@ -1,46 +1,64 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  OnApplicationShutdown,
-} from '@nestjs/common';
-import { Driver, session, Result } from 'neo4j-driver';
-// import { throttleTime } from 'rxjs/operators';
+import { Injectable, Logger } from '@nestjs/common';
+import { throttleTime } from 'rxjs/operators';
 
-import { env } from './env.validations';
+import { Neo4jService } from './neo4j.service';
 import { RoughRecordMessageService } from './rough.record.message.service';
 
 @Injectable()
-export class RoughRecordService implements OnApplicationShutdown {
+export class RoughRecordService {
   constructor(
-    @Inject('NEO4J') private readonly driver: Driver,
     private readonly logger: Logger,
+    private readonly neo4jService: Neo4jService,
     private readonly roughRecordMessageService: RoughRecordMessageService,
-  ) {}
+  ) {
+    this.roughRecordMessageService.messages
+      .pipe(throttleTime(1000 * 60))
+      .subscribe(async statuses => {
+        for await (const status of statuses || [])
+          await this.roughRecordMessageService.removeMessage(status);
 
-  async onApplicationShutdown() {
-    // await this.driver.close();
-  }
+        for await (const status of statuses || []) {
+          const words = status.full_text
+            .replace(/[^\u0d00-\u0d7f ]+/g, ' ')
+            .split(/ +/)
+            .filter(word => word && 1 < word.length);
 
-  getReadSession(dbName?: string) {
-    return this.driver.session({
-      database: dbName || env.NEO4J_DB_NAME,
-      defaultAccessMode: session.READ,
-    });
-  }
+          for (let i = 0; i < words.length - 1; i++)
+            try {
+              await this.neo4jService.write(
+                `MERGE (person:nPerson {name: $tweeterName})
+                MERGE (word:nWord {text: $wordText})
+                  ON CREATE SET word.count = 1
+                  ON MATCH SET word.count = word.count + 1
+                MERGE (person)-[wordTweet:rTweet]->(word)
+                  ON CREATE SET wordTweet += {tweetedAt: $tweetedAt, count: 1}
+                  ON MATCH SET wordTweet += {tweetedAt: $tweetedAt, count: wordTweet.count + 1}
+                MERGE (nextWord:nWord {text: $nextWordText})
+                  ON CREATE SET nextWord.count = 1
+                  ON MATCH SET nextWord.count = nextWord.count + 1
+                MERGE (person)-[nextWordTweet:rTweet]->(nextWord)
+                  ON CREATE SET nextWordTweet += {tweetedAt: $tweetedAt, count: 1}
+                  ON MATCH SET nextWordTweet += {tweetedAt: $tweetedAt, count: nextWordTweet.count + 1}
+                MERGE (word)-[next:rWord]->(nextWord)
+                SET next.updatedAt = $tweetedAt
+                RETURN person, word, nextWord`,
+                {
+                  tweetedAt: status.created_at,
+                  tweeterName: status.user.screen_name,
+                  wordText: words[i],
+                  nextWordText: words[i + 1],
+                },
+              );
+            } catch (e) {
+              this.logger.error(
+                e.message || e,
+                `${words[i]}|${words[i + 1]}`,
+                `RoughRecordService/${status.user.screen_name}`,
+              );
 
-  read(query: string, params?: object, dbName?: string): Result {
-    return this.getReadSession(dbName).run(query, params);
-  }
-
-  getWriteSession(dbName?: string) {
-    return this.driver.session({
-      database: dbName || env.NEO4J_DB_NAME,
-      defaultAccessMode: session.WRITE,
-    });
-  }
-
-  write(query: string, params?: object, dbName?: string): Result {
-    return this.getWriteSession(dbName).run(query, params);
+              i--; // infinite retry
+            }
+        }
+      });
   }
 }

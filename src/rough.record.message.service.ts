@@ -2,21 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { Observable, Subject } from 'rxjs';
 import { map, publishReplay, refCount, scan } from 'rxjs/operators';
 
-import { search_res_statuses } from './twitter.interface';
+import { tweetInterface } from './twitter.interface';
 
-const initialMessages: search_res_statuses[] = [];
+const initialMessages: tweetInterface[] = [];
 
 interface MessageOperation {
-  (messages: search_res_statuses[]): search_res_statuses[];
+  (messages: tweetInterface[]): tweetInterface[];
 }
 
 @Injectable()
 export class RoughRecordMessageService {
-  private deleteMessage = new Subject<search_res_statuses>();
-  private insert = new Subject<search_res_statuses>();
-  messages: Observable<search_res_statuses[]>;
-  private newMessage = new Subject<search_res_statuses>();
-  private remove = new Subject<search_res_statuses>();
+  private deleteMessage = new Subject<tweetInterface>();
+  private insert = new Subject<tweetInterface>();
+  messages: Observable<tweetInterface[]>;
+  private newMessage = new Subject<tweetInterface>();
+  private remove = new Subject<tweetInterface>();
   private update = new Subject<MessageOperation>();
 
   constructor() {
@@ -41,11 +41,11 @@ export class RoughRecordMessageService {
       .subscribe(this.update);
   }
 
-  addMessage(message: search_res_statuses) {
+  addMessage(message: tweetInterface) {
     this.newMessage.next(message);
   }
 
-  removeMessage(message: search_res_statuses) {
+  removeMessage(message: tweetInterface) {
     this.deleteMessage.next(message);
   }
 }

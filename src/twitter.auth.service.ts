@@ -1,77 +1,56 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { InjectModel } from '@nestjs/mongoose';
-import moment = require('moment');
-import { Model } from 'mongoose';
+// import Twitter from 'twitter-lite';
 
-import { modelTokens } from './db.models';
-import { usersModel } from './users.model';
+import { env } from './env.validations';
+import { Neo4jService } from './neo4j.service';
+
+const Twitter = require('twitter-lite');
 
 @Injectable()
 export class TwitterAuthService {
   constructor(
     private readonly jwtService: JwtService,
-    @Inject('TWITTER_AUTH') private readonly twitterAuth,
-    @InjectModel(modelTokens.users)
-    private readonly usersModel: Model<usersModel>,
+    private readonly neo4jService: Neo4jService,
   ) {}
 
   async twitterRequestToken() {
-    return new Promise((resolve, reject) => {
-      this.twitterAuth.getOAuthRequestToken(
-        (
-          error,
-          requestToken,
-          requestTokenSecret,
-          r: { oauth_callback_confirmed: string },
-        ) => {
-          if (error) reject(error);
-          else resolve({ requestToken, requestTokenSecret, r });
-        },
-      );
+    const client = new Twitter({
+      consumer_key: env.TWITTER_CONSUMER_KEY,
+      consumer_secret: env.TWITTER_CONSUMER_SECRET,
     });
+
+    return await client.getRequestToken(env.TWITTER_CALLBACK_URL);
   }
 
-  async twitterAccessToken(requestToken, requestTokenSecret, verifier) {
-    if (requestToken && requestTokenSecret && verifier) {
-      return new Promise((resolve, reject) => {
-        this.twitterAuth.getOAuthAccessToken(
-          requestToken,
-          requestTokenSecret,
-          verifier,
-          async (
-            error,
-            accessToken,
-            accessTokenSecret,
-            r: {
-              screen_name: string;
-              user_id: string;
-            },
-          ) => {
-            if (error) reject(error);
-            else {
-              await this.usersModel.updateOne(
-                { _id: r.screen_name },
-                {
-                  $addToSet: {
-                    roles: 'user',
-                  },
-                  $set: {
-                    access_token: accessToken,
-                    access_token_secret: accessTokenSecret,
-                  },
-                  $unset: { blocked: true },
-                },
-                { upsert: true },
-              );
-
-              resolve({
-                accessToken: this.jwtService.sign({ _id: r.screen_name }),
-              });
-            }
-          },
-        );
+  async twitterAccessToken(oauth_token, oauth_verifier) {
+    if (oauth_token && oauth_verifier) {
+      const client = new Twitter({
+        consumer_key: env.TWITTER_CONSUMER_KEY,
+        consumer_secret: env.TWITTER_CONSUMER_SECRET,
       });
+
+      const {
+        oauth_token: accessTokenKey,
+        oauth_token_secret: accessTokenSecret,
+        screen_name: name,
+        // user_id,
+      } = await client.getAccessToken({
+        oauth_token,
+        oauth_verifier,
+      });
+
+      await this.neo4jService.write(
+        `MERGE (p:nPerson {name: $name})
+        REMOVE p.accessRevoked
+        SET p.accessTokenKey = $accessTokenKey
+        SET p.accessTokenSecret = $accessTokenSecret
+        FOREACH(v IN CASE WHEN 'user' IN COALESCE(p.roles, []) THEN [] ELSE [1] END|SET p.roles = COALESCE(p.roles, []) + 'user')
+        RETURN p.name`,
+        { accessTokenKey, accessTokenSecret, name },
+      );
+
+      return { bearerToken: this.jwtService.sign({ name }) };
     } else throw new BadRequestException();
   }
 }

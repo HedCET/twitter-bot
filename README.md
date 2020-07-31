@@ -1,1 +1,1 @@
-Twitter bot build with NestJS, required [variables](https://github.com/HedCET/twitter-bot/blob/master/src/env.validations.ts#L7)
+Malayalam Twitter bot build with NestJS & NEO4J, required [variables](https://github.com/HedCET/twitter-bot/blob/master/src/env.validations.ts#L7)

@@ -1,105 +1,116 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { omit } from 'lodash';
 import { throttleTime } from 'rxjs/operators';
-import * as twit from 'twit';
+// import Twitter from 'twitter-lite';
 
-import { modelTokens } from './db.models';
 import { env } from './env.validations';
+import { Neo4jService } from './neo4j.service';
 import { ScriptMessageService } from './script.message.service';
 import { scripts } from './scripts';
-import { usersModel } from './users.model';
+
+const Twitter = require('twitter-lite');
 
 @Injectable()
 export class ScriptService {
+  private readonly appProps = [
+    'accessRevoked',
+    'accessTokenKey',
+    'accessTokenSecret',
+    'roles',
+  ];
+
   constructor(
     private readonly logger: Logger,
+    private readonly neo4jService: Neo4jService,
     private readonly scriptMessageService: ScriptMessageService,
-    @InjectModel(modelTokens.users)
-    private readonly usersModel: Model<usersModel>,
   ) {
     this.logger.log(Object.keys(scripts), 'ScriptService/scripts');
 
-    // script executer
+    // script executor
     this.scriptMessageService.messages
       .pipe(throttleTime(1000 * 60))
       .subscribe(async statuses => {
         if (statuses.length) {
-          for (const status of statuses)
+          for await (const status of statuses)
             await this.scriptMessageService.removeMessage(status);
 
-          // get users
-          const users = await this.usersModel.find(
+          // get executors
+          const { records: executors } = await this.neo4jService.read(
+            `MATCH (p:nPerson)
+            WHERE p.name IN $executors
+              AND ((NOT EXISTS (p.accessRevoked)) OR p.accessRevoked <> true)
+              AND EXISTS (p.accessTokenKey)
+              AND EXISTS (p.accessTokenSecret)
+            RETURN p
+            ORDER BY p.accessTokenValidatedAt DESC`,
             {
-              _id: { $in: Object.keys(scripts) },
-              access_token: { $exists: true },
-              access_token_secret: { $exists: true },
-              blocked: { $ne: true },
+              executors: Object.keys(scripts),
             },
-            null,
-            { sort: { access_token_validated_at: 'desc' } },
           );
 
-          for (const user of users) {
+          for (const nPerson of executors || []) {
+            const { properties: executor } = nPerson.get('p');
+
             // twitter instance
-            const twitter = new twit({
-              access_token: user.access_token,
-              access_token_secret: user.access_token_secret,
+            const client = new Twitter({
+              access_token_key: executor.accessTokenKey,
+              access_token_secret: executor.accessTokenSecret,
               consumer_key: env.TWITTER_CONSUMER_KEY,
               consumer_secret: env.TWITTER_CONSUMER_SECRET,
-              strictSSL: true,
-              timeout_ms: 60 * 1000,
             });
 
+            // verify credentials
             try {
-              await twitter.get('account/verify_credentials', {
-                skip_status: true,
-              });
-            } catch (error) {
+              await client.get('account/verify_credentials');
+            } catch (e) {
               this.logger.error(
-                error.message || error,
+                e,
                 'account/verify_credentials',
-                `ScriptService/${user._id}`,
+                `ScriptService/${executor.name}`,
               );
-              await this.usersModel.updateOne(
-                { _id: user._id },
-                { $set: { blocked: true } },
+
+              await this.neo4jService.write(
+                `MATCH (p:nPerson {name: $name})
+                SET p.accessRevoked = true
+                RETURN p.name`,
+                {
+                  name: executor.name,
+                },
               );
+
+              // skip
               continue;
             }
 
-            for (const status of statuses) {
-              // get tweeter
-              const tweeter = await this.usersModel.findOne(
+            for await (const status of statuses) {
+              const {
+                records: [nPerson],
+              } = await this.neo4jService.read(
+                `MATCH (p:nPerson {name: $name})
+                RETURN p`,
                 {
-                  _id: status.user.screen_name,
-                },
-                {
-                  _id: 1,
-                  created_at: 1,
-                  favourites: 1,
-                  followers: 1,
-                  friends: 1,
-                  last_favourites_average: 1,
-                  last_followers_average: 1,
-                  last_friends_average: 1,
-                  last_lists_average: 1,
-                  last_tweeted_at_frequency: 1,
-                  lists: 1,
-                  tweeted_at: 1,
-                  tweets: 1,
+                  name: status.user.screen_name,
                 },
               );
 
-              try {
-                // execute user script
-                await scripts[user._id]({ tweeter, status, twitter, user });
-              } catch (error) {
-                this.logger.error(
-                  error.message || error,
-                  `${status.user.screen_name}/${status.id_str}`,
-                  `scripts/${user._id}`,
-                );
+              if (nPerson) {
+                const { properties: tweeter } = nPerson.get('p');
+
+                try {
+                  // execute user script
+                  await scripts[executor.name]({
+                    client,
+                    executor: omit(executor, this.appProps),
+                    tweeter: omit(tweeter, this.appProps),
+                    status,
+                  });
+                } catch (e) {
+                  this.logger.error(
+                    e,
+                    `${status.user.screen_name}/${status.id_str}`,
+                    `scripts/${executor.name}`,
+                  );
+                }
               }
             }
           }

@@ -14,22 +14,20 @@ export class TwitterAuthController {
   // to test twitter callback
   @Get('twitter_callback')
   async twitterCallback(
-    @Query('oauth_token') authToken: string,
-    @Query('oauth_verifier') authVerifier: string,
+    @Query('oauth_token') oauth_token: string,
+    @Query('oauth_verifier') oauth_verifier: string,
   ) {
-    return { authToken, authVerifier };
+    return { oauth_token, oauth_verifier };
   }
 
   @Post('twitter_access_token')
   async twitterAccessToken(
-    @Body('request_token') requestToken: string,
-    @Body('request_token_secret') requestTokenSecret: string,
-    @Body('verifier') verifier: string,
+    @Body('oauth_token') oauth_token: string,
+    @Body('oauth_verifier') oauth_verifier: string,
   ) {
     return this.twitterAuthService.twitterAccessToken(
-      requestToken,
-      requestTokenSecret,
-      verifier,
+      oauth_token,
+      oauth_verifier,
     );
   }
 }

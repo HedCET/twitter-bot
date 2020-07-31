@@ -1,33 +1,29 @@
 import { CACHE_MANAGER, Inject, Injectable, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
-import { each, find, pick, random } from 'lodash';
+import { capitalize, each, find, pick, random } from 'lodash';
 import * as moment from 'moment';
-import { Model } from 'mongoose';
 import { isJSON } from 'validator';
 
 import { AmqpService } from './amqp.service';
-import { modelTokens } from './db.models';
+import { Neo4jService } from './neo4j.service';
 import { env } from './env.validations';
-import { usersModel } from './users.model';
 
 @Injectable()
 export class WordartService {
-  private WORDART_INDEX = random(env.WORDART_IMAGE_URLS.split('|').length);
-  private readonly WORDART_SERVICES = [
-    'favourites',
+  private index = random(env.WORDART_IMAGE_URLS.split('|').length);
+  private readonly services = [
     'followers',
     'friends',
+    'likes',
     'lists',
-    'tweeted_at',
+    'tweetedAt',
   ];
 
   constructor(
     private readonly amqpService: AmqpService,
     @Inject(CACHE_MANAGER) private readonly cacheManager,
     private readonly logger: Logger,
-    @InjectModel(modelTokens.users)
-    private readonly usersModel: Model<usersModel>,
+    private readonly neo4jService: Neo4jService,
   ) {}
 
   // wordart route handler
@@ -36,13 +32,13 @@ export class WordartService {
     let _wordart = await this.cacheManager.get('_wordart');
     if (!_wordart) _wordart = await this._wordart();
 
-    if (key && -1 < this.WORDART_SERVICES.indexOf(key) && _wordart[key])
+    if (key && -1 < this.services.indexOf(key) && _wordart[key])
       return _wordart[key].wordart;
     else {
       const json = {};
 
       // metadata response
-      each(pick(_wordart, this.WORDART_SERVICES), (value, key) => {
+      each(pick(_wordart, this.services), (value, key) => {
         json[key] = {
           hits: value.tweeters.map(tweeter => tweeter.key),
           startAt: value.startAt,
@@ -54,12 +50,12 @@ export class WordartService {
   }
 
   // populate wordart in cache
-  @Cron('0 5,15,25,35,45,55 * * * *')
+  // @Cron('0 5,15,25,35,45,55 * * * *')
   private async _wordart(key: string = '') {
     if (!key)
-      for (const service of this.WORDART_SERVICES) await this._wordart(service);
+      for await (const service of this.services) await this._wordart(service);
 
-    if (-1 < this.WORDART_SERVICES.indexOf(key)) {
+    if (-1 < this.services.indexOf(key)) {
       const data = { startAt: moment().toDate(), tweeters: [], wordart: {} };
 
       // iterate max 30 times & at-least 10 tweeters
@@ -68,20 +64,26 @@ export class WordartService {
           .subtract((i + 1) * 10, 'minutes')
           .toDate();
 
-        const prop = `last_${key}_${
-          key == 'tweeted_at' ? 'frequency' : 'average'
-        }`;
+        const prop =
+          key === 'tweetedAt' ? 'tweetFrequency' : `average${capitalize(key)}`;
 
-        // dynamic projection
-        const users = await this.usersModel.find(
-          { tweeted_at: { $gte: data.startAt } },
-          { _id: 1, [prop]: 1 },
-          { sort: { tweeted_at: 'desc' } },
+        const { records } = await this.neo4jService.read(
+          `MATCH (p:nPerson)
+          WHERE $startAt <= p.tweetedAt
+          RETURN p.name, p.${prop}
+          ORDER BY p.tweetedAt DESC`,
+          {
+            startAt: data.startAt,
+          },
         );
 
-        for (const user of users)
-          if (0 < user[prop] && !find(data.tweeters, { key: user._id }))
-            data.tweeters.push({ key: user._id, value: Math.ceil(user[prop]) });
+        for (const record of records) {
+          const key = record.get('p.name');
+          const value = record.get(`p.${prop}`);
+
+          if (!find(data.tweeters, { key }) && 0 < (value || 0))
+            data.tweeters.push({ key, value: Math.ceil(value) });
+        }
       }
 
       if (data.tweeters.length) {
@@ -96,8 +98,7 @@ export class WordartService {
                   headers: {
                     // randomizing images
                     image: env.WORDART_IMAGE_URLS.split('|')[
-                      this.WORDART_INDEX++ %
-                        env.WORDART_IMAGE_URLS.split('|').length
+                      this.index++ % env.WORDART_IMAGE_URLS.split('|').length
                     ],
                     // words in csv format
                     words: data.tweeters
@@ -121,7 +122,7 @@ export class WordartService {
               `WordartService/${key}`,
             );
 
-            if (json.statusCode == 200) {
+            if (json.statusCode === 200) {
               data.wordart = json.response;
 
               // custom caching

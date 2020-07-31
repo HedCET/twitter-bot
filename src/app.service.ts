@@ -1,36 +1,40 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 
-import { modelTokens } from './db.models';
-import { usersModel } from './users.model';
+import { Neo4jService } from './neo4j.service';
 
 @Injectable()
 export class AppService {
-  constructor(
-    @InjectModel(modelTokens.users)
-    private readonly usersModel: Model<usersModel>,
-  ) {}
+  constructor(private readonly neo4jService: Neo4jService) {}
 
   // search route handler
   async search(query: string = '') {
-    const _id = new RegExp(query, 'i');
-
-    const hits = await this.usersModel.find(
-      { _id },
-      { _id: 1 },
+    const { records: hits } = await this.neo4jService.read(
+      `MATCH (p:Person)
+      WHERE p.name =~ $query
+      RETURN p.name
+      ORDER BY p.tweetedAt DESC
+      LIMIT 10`,
       {
-        limit: 10,
-        sort: { tweeted_at: 'desc' },
+        query,
       },
     );
 
     return {
-      hits: hits.map(hit => hit._id),
+      hits: (hits || []).map(hit => hit.get('p.name')),
       total:
         hits.length < 10
           ? hits.length
-          : await this.usersModel.countDocuments({ _id }),
+          : (
+              await this.neo4jService.read(
+                `MATCH (p:Person)
+                WHERE p.name =~ $query
+                WITH COUNT(p) AS total
+                RETURN total`,
+                {
+                  query,
+                },
+              )
+            ).records[0].get('total'),
     };
   }
 }
