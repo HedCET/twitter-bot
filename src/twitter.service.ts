@@ -23,7 +23,7 @@ export class TwitterService {
   ) {}
 
   // collect lang:ml tweets
-  // @Cron('0 0,10,20,30,40,50 * * * *')
+  @Cron('0 0,10,20,30,40,50 * * * *')
   private async scheduler() {
     const {
       records: [nPerson],
@@ -32,7 +32,7 @@ export class TwitterService {
         AND EXISTS (p.accessTokenKey)
         AND EXISTS (p.accessTokenSecret)
       RETURN p
-      ORDER BY p.accessTokenValidatedAt
+      ORDER BY COALESCE(p.accessTokenValidatedAt, "1970-01-01T00:00:00.000Z")
       LIMIT 1`);
 
     if (nPerson) {

@@ -16,7 +16,7 @@ export class WordartService {
     'friends',
     'likes',
     'lists',
-    'tweetedAt',
+    'tweeted_at',
   ];
 
   constructor(
@@ -50,28 +50,33 @@ export class WordartService {
   }
 
   // populate wordart in cache
-  // @Cron('0 5,15,25,35,45,55 * * * *')
+  @Cron('0 5,15,25,35,45,55 * * * *')
   private async _wordart(key: string = '') {
     if (!key)
       for await (const service of this.services) await this._wordart(service);
 
     if (-1 < this.services.indexOf(key)) {
-      const data = { startAt: moment().toDate(), tweeters: [], wordart: {} };
+      const data = {
+        startAt: moment().toISOString(),
+        tweeters: [],
+        wordart: {},
+      };
 
       // iterate max 30 times & at-least 10 tweeters
       for (let i = 0; data.tweeters.length < 10 && i < 30; i++) {
         data.startAt = moment(data.startAt)
           .subtract((i + 1) * 10, 'minutes')
-          .toDate();
+          .toISOString();
 
         const prop =
-          key === 'tweetedAt' ? 'tweetFrequency' : `average${capitalize(key)}`;
+          key === 'tweeted_at' ? 'tweetFrequency' : `average${capitalize(key)}`;
 
         const { records } = await this.neo4jService.read(
           `MATCH (p:nPerson)
           WHERE $startAt <= p.tweetedAt
           RETURN p.name, p.${prop}
-          ORDER BY p.tweetedAt DESC`,
+          ORDER BY p.tweetedAt DESC
+          LIMIT 200`,
           {
             startAt: data.startAt,
           },
