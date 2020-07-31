@@ -7,7 +7,6 @@ import * as path from 'path';
 const schema = {
   AMQP_QUEUE_NAME: joi.string().required(),
   AMQP_URL: joi.string().required(),
-  NEO4J_DB_NAME: joi.string().default('neo4j'),
   NEO4J_URL: joi.string().required(),
   NODE_ENV: joi.string().default('development'),
   PORT: joi.number().default(8080),

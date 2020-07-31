@@ -1,10 +1,17 @@
 import { Inject, Injectable, OnApplicationShutdown } from '@nestjs/common';
+import { get } from 'lodash';
 import { Driver, session, Result } from 'neo4j-driver';
 
 import { env } from './env.validations';
 
 @Injectable()
 export class Neo4jService implements OnApplicationShutdown {
+  private readonly dbName = get(
+    env.NEO4J_URL.match(/([^\/]+$)/i),
+    '[1]',
+    'neo4j',
+  );
+
   constructor(@Inject('NEO4J') private readonly driver: Driver) {}
 
   async onApplicationShutdown() {
@@ -13,7 +20,7 @@ export class Neo4jService implements OnApplicationShutdown {
 
   getReadSession(dbName?: string) {
     return this.driver.session({
-      database: dbName || env.NEO4J_DB_NAME,
+      database: dbName || this.dbName,
       defaultAccessMode: session.READ,
     });
   }
@@ -24,7 +31,7 @@ export class Neo4jService implements OnApplicationShutdown {
 
   getWriteSession(dbName?: string) {
     return this.driver.session({
-      database: dbName || env.NEO4J_DB_NAME,
+      database: dbName || this.dbName,
       defaultAccessMode: session.WRITE,
     });
   }
