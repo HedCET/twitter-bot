@@ -14,9 +14,6 @@ export const dbProviders = [
           decodeURIComponent(url.username),
           decodeURIComponent(url.password),
         ),
-        {
-          maxConnectionPoolSize: 1000,
-        },
       );
 
       // verify connectivity

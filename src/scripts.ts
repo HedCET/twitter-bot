@@ -24,7 +24,7 @@ export const scripts = {
       executor.name !== tweeter.name &&
       (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
     ) {
-      // await client.post('statuses/retweet', { id: status.id_str });
+      await client.post('statuses/retweet', { id: status.id_str });
       await new Promise(r => setTimeout(r, 1000 * 10)); // delay 10 seconds
     }
   },

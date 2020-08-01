@@ -34,7 +34,7 @@ export class AppService {
                   query,
                 },
               )
-            ).records[0].get('total'),
+            ).records[0].get('total').toNumber(),
     };
   }
 }
