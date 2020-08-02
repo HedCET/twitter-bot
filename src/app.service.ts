@@ -8,14 +8,16 @@ export class AppService {
 
   // search route handler
   async search(query: string = '') {
+    const name = query.split(' ')[0];
+
     const { records: hits } = await this.neo4jService.read(
       `MATCH (p:nPerson)
-      WHERE p.name =~ $query
+      WHERE p.name =~ $name
       RETURN p.name
       ORDER BY COALESCE(p.tweetedAt, "1970-01-01T00:00:00.000Z") DESC
       LIMIT 10`,
       {
-        query,
+        name,
       },
     );
 
@@ -27,11 +29,11 @@ export class AppService {
           : (
               await this.neo4jService.read(
                 `MATCH (p:nPerson)
-                WHERE p.name =~ $query
+                WHERE p.name =~ $name
                 WITH COUNT(p) AS total
                 RETURN total`,
                 {
-                  query,
+                  name,
                 },
               )
             ).records[0]
