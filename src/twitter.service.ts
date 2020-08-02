@@ -309,7 +309,7 @@ export class TwitterService {
               },
             );
 
-          // filter new tweets
+          // new tweet finder
           const {
             records: [nTweet],
           } = await this.neo4jService.read(
