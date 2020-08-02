@@ -1,14 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import { Neo4jService } from './neo4j.service';
 
 @Injectable()
 export class AppService {
-  constructor(private readonly neo4jService: Neo4jService) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly neo4jService: Neo4jService,
+  ) {}
 
   // search route handler
   async search(query: string = '') {
-    const name = query.split(' ')[0];
+    this.logger.log(query, 'AppService/search');
+
+    // no spaces
+    const name = query.replace(/\s+/g, '');
 
     const { records: hits } = await this.neo4jService.read(
       `MATCH (p:nPerson)
