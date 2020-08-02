@@ -28,23 +28,20 @@ export class RoughRecordService {
               await this.neo4jService.write(
                 `MERGE (person:nPerson {name: $tweeterName})
                 MERGE (word:nWord {text: $wordText})
-                  ON CREATE SET word.count = 1
-                  ON MATCH SET word.count = word.count + 1
                 MERGE (person)-[wordTweet:rTweet]->(word)
-                  ON CREATE SET wordTweet += {tweetedAt: $tweetedAt, count: 1}
-                  ON MATCH SET wordTweet += {tweetedAt: $tweetedAt, count: wordTweet.count + 1}
+                  ON CREATE SET wordTweet += {count: 1, updatedAt: $updatedAt}
+                  ON MATCH SET wordTweet += {count: wordTweet.count + 1, updatedAt: $updatedAt}
                 MERGE (nextWord:nWord {text: $nextWordText})
-                  ON CREATE SET nextWord.count = 1
-                  ON MATCH SET nextWord.count = nextWord.count + 1
                 MERGE (person)-[nextWordTweet:rTweet]->(nextWord)
-                  ON CREATE SET nextWordTweet += {tweetedAt: $tweetedAt, count: 1}
-                  ON MATCH SET nextWordTweet += {tweetedAt: $tweetedAt, count: nextWordTweet.count + 1}
+                  ON CREATE SET nextWordTweet += {count: 1, updatedAt: $updatedAt}
+                  ON MATCH SET nextWordTweet += {count: nextWordTweet.count + 1, updatedAt: $updatedAt}
                 MERGE (word)-[next:rWord]->(nextWord)
-                SET next.updatedAt = $tweetedAt
-                RETURN person, word, nextWord`,
+                  ON CREATE SET next += {count: 1, updatedAt: $updatedAt}
+                  ON MATCH SET next += {count: next.count + 1, updatedAt: $updatedAt}
+                RETURN person.name`,
                 {
-                  tweetedAt: status.created_at,
                   tweeterName: status.user.screen_name,
+                  updatedAt: status.created_at,
                   wordText: words[i],
                   nextWordText: words[i + 1],
                 },
