@@ -12,7 +12,7 @@ export class AppService {
       `MATCH (p:nPerson)
       WHERE p.name =~ $query
       RETURN p.name
-      ORDER BY p.tweetedAt DESC
+      ORDER BY COALESCE(p.tweetedAt, "1970-01-01T00:00:00.000Z") DESC
       LIMIT 10`,
       {
         query,
@@ -34,7 +34,9 @@ export class AppService {
                   query,
                 },
               )
-            ).records[0].get('total').toNumber(),
+            ).records[0]
+              .get('total')
+              .toNumber(),
     };
   }
 }

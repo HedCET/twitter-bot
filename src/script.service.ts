@@ -42,7 +42,7 @@ export class ScriptService {
               AND EXISTS (p.accessTokenKey)
               AND EXISTS (p.accessTokenSecret)
             RETURN p
-            ORDER BY p.accessTokenValidatedAt DESC`,
+            ORDER BY COALESCE(p.accessTokenValidatedAt, "1970-01-01T00:00:00.000Z") DESC`,
             {
               executors: Object.keys(scripts),
             },

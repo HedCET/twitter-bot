@@ -75,7 +75,7 @@ export class WordartService {
           `MATCH (p:nPerson)
           WHERE $startAt <= p.tweetedAt
           RETURN p.name, p.${prop}
-          ORDER BY p.tweetedAt DESC
+          ORDER BY COALESCE(p.tweetedAt, "1970-01-01T00:00:00.000Z") DESC
           LIMIT 200`,
           {
             startAt: data.startAt,
