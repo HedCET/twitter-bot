@@ -66,8 +66,8 @@ export class WordartService {
         wordart: {},
       };
 
-      // iterate max 30 times & at-least 10 tweeters
-      for (let i = 0; data.tweeters.length < 10 && i < 30; i++) {
+      // iterate max 36 times (6 hours) or at-least 10 tweeters
+      for (let i = 0; data.tweeters.length < 10 && i < 36; i++) {
         data.startAt = moment(data.startAt)
           .subtract((i + 1) * 10, 'minutes')
           .toISOString();

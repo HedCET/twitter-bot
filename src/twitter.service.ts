@@ -86,6 +86,7 @@ export class TwitterService {
         return this.search();
       }
 
+      // maximum 60 times
       for (let i = 0, maxId; i < 60; i++) {
         const request: searchRequest = {
           count: 100,
