@@ -1,5 +1,6 @@
 import { CacheModule, Global, Module, Logger } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
 import { ScheduleModule } from '@nestjs/schedule';
 
@@ -7,12 +8,9 @@ import { amqpProviders } from './amqp.providers';
 import { AmqpService } from './amqp.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { dbProviders } from './db.providers';
+import { dbModels } from './db.models';
 import { env } from './env.validations';
 import { JwtStrategy } from './jwt.strategy';
-import { Neo4jService } from './neo4j.service';
-import { RoughRecordMessageService } from './rough.record.message.service';
-import { RoughRecordService } from './rough.record.service';
 import { ScriptMessageService } from './script.message.service';
 import { ScriptService } from './script.service';
 import { TwitterAuthController } from './twitter.auth.controller';
@@ -29,19 +27,20 @@ import { WordartService } from './wordart.service';
       ttl: 600,
     }),
     JwtModule.register({ secret: env.SECRET }),
+    MongooseModule.forRoot(env.MONGO_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    }),
+    MongooseModule.forFeature([...dbModels]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     ScheduleModule.forRoot(),
   ],
   providers: [
     ...amqpProviders,
-    ...dbProviders,
     AmqpService,
     AppService,
     JwtStrategy,
     Logger,
-    Neo4jService,
-    RoughRecordMessageService,
-    RoughRecordService,
     ScriptMessageService,
     ScriptService,
     TwitterAuthService,

@@ -7,15 +7,12 @@ export interface searchRequest {
   tweet_mode: string;
 }
 
-export interface searchResponse {
-  statuses: tweetInterface[];
-}
-
 export interface tweeterInterface {
   created_at: string;
   favourites_count: number;
   followers_count: number;
   friends_count: number;
+  id_str: string;
   listed_count: number;
   screen_name: string;
   statuses_count: number;

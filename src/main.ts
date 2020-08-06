@@ -7,10 +7,13 @@ import * as compression from 'compression';
 // import * as csurf from 'csurf';
 import * as expressRateLimit from 'express-rate-limit';
 import * as helmet from 'helmet';
+import * as mongoose from 'mongoose';
 
 // import { AllExceptionsFilter } from './all.exceptions.filter';
 import { AppModule } from './app.module';
 import { env } from './env.validations';
+
+// mongoose.set('debug', env.NODE_ENV === 'production' ? false : true);
 
 const bootstrap = async () => {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {

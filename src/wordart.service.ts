@@ -1,12 +1,15 @@
 import { CACHE_MANAGER, Inject, Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import { capitalize, each, find, pick, random } from 'lodash';
 import * as moment from 'moment';
+import { Model } from 'mongoose';
 import { isJSON } from 'validator';
 
 import { AmqpService } from './amqp.service';
-import { Neo4jService } from './neo4j.service';
+import { modelTokens } from './db.models';
 import { env } from './env.validations';
+import { usersModel } from './users.model';
 
 @Injectable()
 export class WordartService {
@@ -23,7 +26,8 @@ export class WordartService {
     private readonly amqpService: AmqpService,
     @Inject(CACHE_MANAGER) private readonly cacheManager,
     private readonly logger: Logger,
-    private readonly neo4jService: Neo4jService,
+    @InjectModel(modelTokens.users)
+    private readonly usersModel: Model<usersModel>,
   ) {}
 
   // wordart route handler
@@ -50,7 +54,7 @@ export class WordartService {
   }
 
   // populate wordart in cache
-  @Cron('0 5,15,25,35,45,55 * * * *')
+  // @Cron('0 5,15,25,35,45,55 * * * *')
   private async _wordart(key: string = '') {
     if (!key)
       for await (const service of this.services) await this._wordart(service);
@@ -71,24 +75,19 @@ export class WordartService {
         const prop =
           key === 'tweeted_at' ? 'tweetFrequency' : `average${capitalize(key)}`;
 
-        const { records } = await this.neo4jService.read(
-          `MATCH (p:nPerson)
-          WHERE $startAt <= p.tweetedAt
-          RETURN p.name, p.${prop}
-          ORDER BY COALESCE(p.tweetedAt, "1970-01-01T00:00:00.000Z") DESC
-          LIMIT 200`,
-          {
-            startAt: data.startAt,
-          },
+        // dynamic projection
+        const users = await this.usersModel.find(
+          { tweetedAt: { $gte: data.startAt } },
+          { name: 1, [prop]: 1 },
+          { sort: { tweetedAt: 'desc' } },
         );
 
-        for (const record of records) {
-          const key = record.get('p.name');
-          const value = record.get(`p.${prop}`);
-
-          if (!find(data.tweeters, { key }) && 0 < (value || 0))
-            data.tweeters.push({ key, value: Math.ceil(value) });
-        }
+        for (const user of users)
+          if (!find(data.tweeters, { key: user.name }) && 0 < (user[prop] || 0))
+            data.tweeters.push({
+              key: user.name,
+              value: Math.ceil(user[prop]),
+            });
       }
 
       if (data.tweeters.length) {

@@ -1,9 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
 
+import { modelTokens } from './db.models';
 import { env } from './env.validations';
-import { Neo4jService } from './neo4j.service';
+import { usersModel } from './users.model';
 
 const Twitter = require('twitter-lite');
 
@@ -11,7 +14,8 @@ const Twitter = require('twitter-lite');
 export class TwitterAuthService {
   constructor(
     private readonly jwtService: JwtService,
-    private readonly neo4jService: Neo4jService,
+    @InjectModel(modelTokens.users)
+    private readonly usersModel: Model<usersModel>,
   ) {}
 
   async twitterRequestToken() {
@@ -34,23 +38,23 @@ export class TwitterAuthService {
         oauth_token: accessTokenKey,
         oauth_token_secret: accessTokenSecret,
         screen_name: name,
-        // user_id,
+        user_id: _id,
       } = await client.getAccessToken({
         oauth_token,
         oauth_verifier,
       });
 
-      await this.neo4jService.write(
-        `MERGE (p:nPerson {name: $name})
-        REMOVE p.accessRevoked
-        SET p.accessTokenKey = $accessTokenKey
-        SET p.accessTokenSecret = $accessTokenSecret
-        FOREACH(v IN CASE WHEN 'user' IN COALESCE(p.roles, []) THEN [] ELSE [1] END|SET p.roles = COALESCE(p.roles, []) + 'user')
-        RETURN p.name`,
-        { accessTokenKey, accessTokenSecret, name },
+      await this.usersModel.updateOne(
+        { _id },
+        {
+          $addToSet: { roles: 'user' },
+          $set: { accessTokenKey, accessTokenSecret, name },
+          $unset: { accessRevoked: true },
+        },
+        { upsert: true },
       );
 
-      return { bearerToken: this.jwtService.sign({ name }) };
+      return { bearerToken: this.jwtService.sign({ _id }) };
     } else throw new BadRequestException();
   }
 }

@@ -1,57 +1,69 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { sortBy } from 'lodash';
+import { find, omit, sortBy } from 'lodash';
 import * as moment from 'moment';
+import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
 
+import { modelTokens } from './db.models';
 import { env } from './env.validations';
-import { Neo4jService } from './neo4j.service';
-import { RoughRecordMessageService } from './rough.record.message.service';
 import { ScriptMessageService } from './script.message.service';
-import { searchRequest, searchResponse } from './twitter.interface';
+import { tweetsModel } from './tweets.model';
+import { searchRequest, tweetInterface } from './twitter.interface';
+import { usersModel } from './users.model';
 
 const Twitter = require('twitter-lite');
 
 @Injectable()
 export class TwitterService {
+  // private readonly appProps = [
+  //   'accessRevoked',
+  //   'accessTokenKey',
+  //   'accessTokenSecret',
+  //   'roles',
+  // ];
+
   constructor(
     private readonly logger: Logger,
-    private readonly neo4jService: Neo4jService,
-    private readonly roughRecordMessageService: RoughRecordMessageService,
     private readonly scriptMessageService: ScriptMessageService,
-  ) {}
+    @InjectModel(modelTokens.tweets)
+    private readonly tweetsModel: Model<tweetsModel>,
+    @InjectModel(modelTokens.users)
+    private readonly usersModel: Model<usersModel>,
+  ) {
+    this.search();
+  }
 
-  // collect lang:ml tweets
-  @Cron('0 0,10,20,30,40,50 * * * *')
-  private async scheduler() {
+  // search (scheduled)
+  // @Cron('0 0,10,20,30,40,50 * * * *')
+  private async search(searchInput?: searchRequest) {
     const {
-      records: [nPerson],
-    } = await this.neo4jService.read(`MATCH (p:nPerson)
-      WHERE ((NOT EXISTS (p.accessRevoked)) OR p.accessRevoked <> true)
-        AND EXISTS (p.accessTokenKey)
-        AND EXISTS (p.accessTokenSecret)
-      RETURN p
-      ORDER BY COALESCE(p.accessTokenValidatedAt, "1970-01-01T00:00:00.000Z")
-      LIMIT 1`);
+      _id,
+      accessTokenKey: access_token_key,
+      accessTokenSecret: access_token_secret,
+      name,
+    } = await this.usersModel.findOne(
+      {
+        accessRevoked: { $ne: true },
+        accessTokenKey: { $exists: true },
+        accessTokenSecret: { $exists: true },
+      },
+      { _id: 1, accessTokenKey: 1, accessTokenSecret: 1, name: 1 },
+      { sort: { accessTokenValidatedAt: 'asc' } },
+    );
 
-    if (nPerson) {
-      const { properties: executor } = nPerson.get('p');
-
+    if (_id) {
       // update accessTokenValidatedAt
-      await this.neo4jService.write(
-        `MATCH (p:nPerson {name: $name})
-        SET p.accessTokenValidatedAt = $accessTokenValidatedAt
-        RETURN p.name`,
-        {
-          name: executor.name,
-          accessTokenValidatedAt: moment().toISOString(),
-        },
+      await this.usersModel.updateOne(
+        { _id },
+        { $set: { accessTokenValidatedAt: moment().toDate() } },
       );
 
       const client = new Twitter({
-        access_token_key: executor.accessTokenKey,
-        access_token_secret: executor.accessTokenSecret,
+        access_token_key,
+        access_token_secret,
         consumer_key: env.TWITTER_CONSUMER_KEY,
         consumer_secret: env.TWITTER_CONSUMER_SECRET,
       });
@@ -60,41 +72,53 @@ export class TwitterService {
       try {
         await client.get('account/verify_credentials');
       } catch (e) {
-        console.log(e);
         this.logger.error(
           e,
-          `account/verify_credentials/${executor.name}`,
-          'TwitterService/scheduler',
+          `account/verify_credentials/${name}`,
+          'TwitterService/search',
         );
 
-        await this.neo4jService.write(
-          `MATCH (p:nPerson {name: $name})
-          SET p.accessRevoked = true
-          RETURN p.name`,
-          {
-            name: executor.name,
-          },
+        // accessRevoked
+        await this.usersModel.updateOne(
+          { _id },
+          { $set: { accessRevoked: true } },
         );
 
         // recursive
-        return this.scheduler();
+        return this.search();
       }
 
-      for (let i = 0, maxId; i < 30; i++) {
+      for (let i = 0, maxId; i < 60; i++) {
         const request: searchRequest = {
           count: 100,
           lang: 'ml',
-          q: '%2A',
+          q: '%2A', // '*',
           result_type: 'recent',
           tweet_mode: 'extended',
+          ...(searchInput || {}),
         };
 
         // limit 100 & skip till maxId
         if (maxId) request.max_id = maxId;
 
-        const response: searchResponse = await client.get(
-          'search/tweets',
-          request,
+        const response: {
+          _headers: { [key: string]: any };
+          statuses: tweetInterface[];
+        } = await client.get('search/tweets', request);
+
+        // statistics
+        this.logger.log(
+          {
+            remainingMinutes: moment
+              .duration(
+                moment(response._headers.get('x-rate-limit-reset'), ['X']).diff(
+                  moment(),
+                ),
+              )
+              .asMinutes(),
+            remainingRequests: response._headers.get('x-rate-limit-remaining'),
+          },
+          'TwitterService/search',
         );
 
         // break if empty array
@@ -102,10 +126,10 @@ export class TwitterService {
 
         // ascending sort
         const statuses = sortBy(response.statuses, [
-          item =>
-            `${moment(item.created_at, [
+          status =>
+            `${moment(status.created_at, [
               'ddd MMM D HH:mm:ss ZZ YYYY',
-            ]).toISOString()}|${item.id_str}`,
+            ]).toISOString()}|${status.id_str}`,
         ]);
 
         // set maxId for next iteration
@@ -117,223 +141,124 @@ export class TwitterService {
         let newTweets = 0;
 
         for await (const status of statuses) {
-          const name = status.user.screen_name; // primary key
-
-          // existing user in DB
-          let user: { [key: string]: any } = {};
-
-          const {
-            records: [nPerson],
-          } = await this.neo4jService.write(
-            `MERGE (p:nPerson {name: $name})
-              ON CREATE SET p.createdAt = $createdAt
-            RETURN p`,
-            {
-              createdAt: moment(status.user.created_at, [
-                'ddd MMM D HH:mm:ss ZZ YYYY',
-              ]).toISOString(),
-              name,
-            },
-          );
-
-          if (nPerson) {
-            const { properties } = nPerson.get('p');
-            user = properties || {};
-          }
-
-          // tweetedAt
           const tweetedAt = moment(status.created_at, [
             'ddd MMM D HH:mm:ss ZZ YYYY',
           ]);
 
-          let tweetFrequency; // per day
-          if (user.tweetedAt && tweetedAt.isAfter(user.tweetedAt))
-            tweetFrequency = moment
-              .duration(tweetedAt.diff(user.tweetedAt))
-              .asDays();
+          const $set: { [key: string]: any } = {
+            createdAt: moment(status.user.created_at, [
+              'ddd MMM D HH:mm:ss ZZ YYYY',
+            ]).toDate(),
+            name: status.user.screen_name,
+            tweetedAt,
+          };
+          const $unset: { [key: string]: any } = {};
 
-          await this.neo4jService.write(
-            `MATCH (p:nPerson {name: $name})
-            SET p += $extend
-            RETURN p.name`,
-            {
-              extend: {
-                tweetedAt: tweetedAt.toISOString(),
-                tweetFrequency,
-              },
-              name,
-            },
-          );
+          // followers
+          if (status.user.followers_count)
+            $set.followers = status.user.followers_count;
+          else $unset.followers = true;
+
+          // friends
+          if (status.user.friends_count)
+            $set.friends = status.user.friends_count;
+          else $unset.friends = true;
+
+          // likes
+          if (status.user.favourites_count)
+            $set.likes = status.user.favourites_count;
+          else $unset.likes = true;
+
+          // lists
+          if (status.user.listed_count) $set.lists = status.user.listed_count;
+          else $unset.lists = true;
 
           // tweets
           if (status.user.statuses_count)
-            await this.neo4jService.write(
-              `MATCH (p:nPerson {name: $name})
-              SET p.tweets = toInteger($tweets)
-              RETURN p.name`,
-              {
-                name,
-                tweets: status.user.statuses_count,
-              },
-            );
-          else
-            await this.neo4jService.write(
-              `MATCH (p:nPerson {name: $name})
-              REMOVE p.tweets
-              RETURN p.name`,
-              {
-                name,
-              },
-            );
+            $set.tweets = status.user.statuses_count;
+          else $unset.tweets = true;
 
-          // likes
-          if (status.user.favourites_count) {
-            let averageLikes; // per day
-            if (tweetFrequency)
-              averageLikes =
-                (status.user.favourites_count - (user.likes || 0)) /
-                tweetFrequency;
-
-            await this.neo4jService.write(
-              `MATCH (p:nPerson {name: $name})
-              SET p += $extend
-              SET p.likes = toInteger($likes)
-              RETURN p.name`,
-              {
-                extend: {
-                  averageLikes,
-                },
-                likes: status.user.favourites_count,
-                name,
-              },
-            );
-          } else
-            await this.neo4jService.write(
-              `MATCH (p:nPerson {name: $name})
-              REMOVE p.likes
-              RETURN p.name`,
-              {
-                name,
-              },
-            );
-
-          // followers
-          if (status.user.followers_count) {
-            let averageFollowers; // per day
-            if (tweetFrequency)
-              averageFollowers =
-                (status.user.followers_count - (user.followers || 0)) /
-                tweetFrequency;
-
-            await this.neo4jService.write(
-              `MATCH (p:nPerson {name: $name})
-              SET p += $extend
-              SET p.followers = toInteger($followers)
-              RETURN p.name`,
-              {
-                extend: {
-                  averageFollowers,
-                },
-                followers: status.user.followers_count,
-                name,
-              },
-            );
-          } else
-            await this.neo4jService.write(
-              `MATCH (p:nPerson {name: $name})
-              REMOVE p.followers
-              RETURN p.name`,
-              {
-                name,
-              },
-            );
-
-          // friends
-          if (status.user.friends_count) {
-            let averageFriends; // per day
-            if (tweetFrequency)
-              averageFriends =
-                (status.user.friends_count - (user.friends || 0)) /
-                tweetFrequency;
-
-            await this.neo4jService.write(
-              `MATCH (p:nPerson {name: $name})
-              SET p += $extend
-              SET p.friends = toInteger($friends)
-              RETURN p.name`,
-              {
-                extend: {
-                  averageFriends,
-                },
-                friends: status.user.friends_count,
-                name,
-              },
-            );
-          } else
-            await this.neo4jService.write(
-              `MATCH (p:nPerson {name: $name})
-              REMOVE p.friends
-              RETURN p.name`,
-              {
-                name,
-              },
-            );
-
-          // lists
-          if (status.user.listed_count) {
-            let averageLists; // per day
-            if (tweetFrequency)
-              averageLists =
-                (status.user.listed_count - (user.lists || 0)) / tweetFrequency;
-
-            await this.neo4jService.write(
-              `MATCH (p:nPerson {name: $name})
-              SET p += $extend
-              SET p.lists = toInteger($lists)
-              RETURN p.name`,
-              {
-                extend: {
-                  averageLists,
-                },
-                lists: status.user.listed_count,
-                name,
-              },
-            );
-          } else
-            await this.neo4jService.write(
-              `MATCH (p:nPerson {name: $name})
-              REMOVE p.lists
-              RETURN p.name`,
-              {
-                name,
-              },
-            );
-
-          // new tweet finder
-          const {
-            records: [nTweet],
-          } = await this.neo4jService.read(
-            `MATCH (t:nTweet {id: $id})
-            RETURN t`,
+          // existing users
+          const users = await this.usersModel.find(
             {
-              id: status.id_str,
+              _id: { $in: [status.user.id_str, status.user.screen_name] },
             },
+            null,
+            // this.appProps.reduce(
+            //   (memory, value) => ({ ...memory, [value]: 0 }),
+            //   {},
+            // ),
+            { sort: { tweetedAt: 'asc' } },
           );
 
-          if (!nTweet) {
-            await this.neo4jService.write(
-              `MERGE (t:nTweet {id: $id})
-              RETURN t`,
-              {
-                id: status.id_str,
-              },
-            );
+          if (users.length) {
+            const user = users
+              .map(v => v.toObject())
+              .reduce((memory, value) => ({ ...memory, ...value }), {});
 
+            // migrate _id from screen_name to id_str
+            if (
+              1 < users.length ||
+              find(users, { _id: status.user.screen_name })
+            ) {
+              await this.usersModel.deleteOne({ _id: status.user.screen_name });
+              await this.usersModel.updateOne(
+                { _id: status.user.id_str },
+                { $set: omit(user, ['_id']) },
+                { upsert: true },
+              );
+            }
+
+            if (tweetedAt.isAfter(user.tweetedAt)) {
+              // tweet frequency per day
+              $set.tweetFrequency = moment
+                .duration(tweetedAt.diff(user.tweetedAt))
+                .asDays();
+
+              // average followers per day
+              if (
+                user.followers &&
+                status.user.followers_count !== user.followers
+              )
+                $set.averageFollowers =
+                  (status.user.followers_count - user.followers) /
+                  $set.tweetFrequency;
+
+              // average friends per day
+              if (user.friends && status.user.friends_count !== user.friends)
+                $set.averageFriends =
+                  (status.user.friends_count - user.friends) /
+                  $set.tweetFrequency;
+
+              // average likes per day
+              if (user.likes && status.user.favourites_count !== user.likes)
+                $set.averageLikes =
+                  (status.user.favourites_count - user.likes) /
+                  $set.tweetFrequency;
+
+              // average lists per day
+              if (user.lists && status.user.listed_count !== user.lists)
+                $set.averageLists =
+                  (status.user.listed_count - user.lists) / $set.tweetFrequency;
+            }
+          }
+
+          // upsert
+          await this.usersModel.updateOne(
+            { _id: status.user.id_str },
+            { $set, $unset },
+            { upsert: true },
+          );
+
+          // new tweet finder
+          const tweet = await this.tweetsModel.findOne({
+            _id: status.id_str,
+          });
+
+          if (!tweet) {
             newTweets++;
-
-            // publish to RxJS message stream
-            this.roughRecordMessageService.addMessage(status);
-            this.scriptMessageService.addMessage(status);
+            await new this.tweetsModel({ _id: status.id_str }).save();
+            this.scriptMessageService.addMessage(status); // publish to RxJS message stream
           }
         }
 
@@ -345,13 +270,24 @@ export class TwitterService {
       }
     }
 
-    await this.neo4jService.write(
-      `MATCH (t:nTweet)
-      WITH t
-      ORDER BY t.id DESC 
-      SKIP 100000
-      DETACH DELETE t`,
-    );
+    const thresholdTweet = await this.tweetsModel.findOne({}, null, {
+      skip: 100000,
+      sort: { _id: 'desc' },
+    });
+
+    if (thresholdTweet)
+      await this.tweetsModel.deleteMany({ _id: { $lte: thresholdTweet._id } });
+
+    const usersModelStats = await this.usersModel.collection.stats();
+
+    if (384 * 1024 * 1024 < usersModelStats.storageSize)
+      await this.usersModel.deleteMany({
+        tweeted_at: {
+          $lt: moment()
+            .subtract(1, 'years')
+            .toDate(),
+        },
+      });
 
     return true;
   }

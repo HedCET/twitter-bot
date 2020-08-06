@@ -1,50 +1,33 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 
-import { Neo4jService } from './neo4j.service';
+import { modelTokens } from './db.models';
+import { usersModel } from './users.model';
 
 @Injectable()
 export class AppService {
   constructor(
-    private readonly logger: Logger,
-    private readonly neo4jService: Neo4jService,
+    @InjectModel(modelTokens.users)
+    private readonly usersModel: Model<usersModel>,
   ) {}
 
   // search route handler
   async search(query: string = '') {
-    this.logger.log(query, 'AppService/search');
+    const name = new RegExp(query, 'i');
 
-    // no spaces
-    const name = query.replace(/\s+/g, '');
-
-    const { records: hits } = await this.neo4jService.read(
-      `MATCH (p:nPerson)
-      WHERE p.name =~ $name
-      RETURN p.name
-      ORDER BY COALESCE(p.tweetedAt, "1970-01-01T00:00:00.000Z") DESC
-      LIMIT 10`,
-      {
-        name,
-      },
+    const hits = await this.usersModel.find(
+      { name },
+      { name: 1 },
+      { limit: 10, sort: { tweetedAt: 'desc' } },
     );
 
     return {
-      hits: (hits || []).map(hit => hit.get('p.name')),
+      hits: hits.map(hit => hit.name),
       total:
         hits.length < 10
           ? hits.length
-          : (
-              await this.neo4jService.read(
-                `MATCH (p:nPerson)
-                WHERE p.name =~ $name
-                WITH COUNT(p) AS total
-                RETURN total`,
-                {
-                  name,
-                },
-              )
-            ).records[0]
-              .get('total')
-              .toNumber(),
+          : await this.usersModel.countDocuments({ name }),
     };
   }
 }

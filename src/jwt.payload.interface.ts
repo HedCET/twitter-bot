@@ -1,3 +1,3 @@
 export interface jwtPayload {
-  name: string;
+  _id: string;
 }
