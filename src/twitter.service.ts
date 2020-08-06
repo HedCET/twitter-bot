@@ -32,9 +32,7 @@ export class TwitterService {
     private readonly tweetsModel: Model<tweetsModel>,
     @InjectModel(modelTokens.users)
     private readonly usersModel: Model<usersModel>,
-  ) {
-    this.search();
-  }
+  ) {}
 
   // search (scheduled)
   @Cron('0 0,10,20,30,40,50 * * * *')
