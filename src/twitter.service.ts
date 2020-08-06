@@ -37,7 +37,7 @@ export class TwitterService {
   }
 
   // search (scheduled)
-  // @Cron('0 0,10,20,30,40,50 * * * *')
+  @Cron('0 0,10,20,30,40,50 * * * *')
   private async search(searchInput?: searchRequest) {
     const {
       _id,

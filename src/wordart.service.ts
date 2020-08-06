@@ -54,7 +54,7 @@ export class WordartService {
   }
 
   // populate wordart in cache
-  // @Cron('0 5,15,25,35,45,55 * * * *')
+  @Cron('0 5,15,25,35,45,55 * * * *')
   private async _wordart(key: string = '') {
     if (!key)
       for await (const service of this.services) await this._wordart(service);
@@ -79,7 +79,7 @@ export class WordartService {
         const users = await this.usersModel.find(
           { tweetedAt: { $gte: data.startAt } },
           { name: 1, [prop]: 1 },
-          { sort: { tweetedAt: 'desc' } },
+          { limit: 200, sort: { tweetedAt: 'desc' } },
         );
 
         for (const user of users)
