@@ -54,7 +54,7 @@ export class WordartService {
   }
 
   // populate wordart in cache
-  @Cron('0 5,15,25,35,45,55 * * * *')
+  @Cron('0 */10 * * * *')
   private async _wordart(key: string = '') {
     if (!key)
       for await (const service of this.services) await this._wordart(service);

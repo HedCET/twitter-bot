@@ -34,8 +34,8 @@ export class TwitterService {
     private readonly usersModel: Model<usersModel>,
   ) {}
 
-  // search (scheduled)
-  @Cron('0 0,10,20,30,40,50 * * * *')
+  // scheduled search
+  @Cron('0 */5 * * * *')
   private async search(searchInput?: searchRequest) {
     const {
       _id,
