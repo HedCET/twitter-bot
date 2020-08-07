@@ -54,7 +54,7 @@ export class WordartService {
   }
 
   // populate wordart in cache
-  @Cron('0 */10 * * * *')
+  @Cron('0 */15 * * * *')
   private async _wordart(key: string = '') {
     if (!key)
       for await (const service of this.services) await this._wordart(service);
@@ -66,10 +66,10 @@ export class WordartService {
         wordart: {},
       };
 
-      // iterate max 36 times (6 hours) or at-least 10 tweeters
-      for (let i = 0; data.tweeters.length < 10 && i < 36; i++) {
+      // iterate max 24 times (6 hours) or at-least 10 tweeters
+      for (let i = 0; data.tweeters.length < 10 && i < 24; i++) {
         data.startAt = moment(data.startAt)
-          .subtract((i + 1) * 10, 'minutes')
+          .subtract((i + 1) * 15, 'minutes')
           .toISOString();
 
         const prop =
