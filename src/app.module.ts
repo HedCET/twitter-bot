@@ -28,6 +28,7 @@ import { WordartService } from './wordart.service';
     }),
     JwtModule.register({ secret: env.SECRET }),
     MongooseModule.forRoot(env.MONGO_URL, {
+      useCreateIndex: true,
       useNewUrlParser: true,
       useUnifiedTopology: true,
     }),
