@@ -278,7 +278,7 @@ export class TwitterService {
         roles: { $size: 0 },
         tweeted_at: {
           $lt: moment()
-            .subtract(1, 'years')
+            .subtract(6, 'months')
             .toDate(),
         },
       });
