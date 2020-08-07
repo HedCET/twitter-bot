@@ -138,7 +138,7 @@ export class TwitterService {
           const tweetedAt = moment(status.created_at, [
             'ddd MMM D HH:mm:ss ZZ YYYY',
           ]);
-
+          const $unset: { [key: string]: any } = {};
           const $set: { [key: string]: any } = {
             createdAt: moment(status.user.created_at, [
               'ddd MMM D HH:mm:ss ZZ YYYY',
@@ -146,7 +146,6 @@ export class TwitterService {
             name: status.user.screen_name,
             tweetedAt,
           };
-          const $unset: { [key: string]: any } = {};
 
           // followers
           if (status.user.followers_count)
