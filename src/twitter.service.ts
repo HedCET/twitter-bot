@@ -275,6 +275,7 @@ export class TwitterService {
 
     if (384 * 1024 * 1024 < usersModelStats.storageSize)
       await this.usersModel.deleteMany({
+        roles: { $size: 0 },
         tweeted_at: {
           $lt: moment()
             .subtract(1, 'years')
