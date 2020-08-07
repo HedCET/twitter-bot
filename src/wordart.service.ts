@@ -13,7 +13,7 @@ import { usersModel } from './users.model';
 
 @Injectable()
 export class WordartService {
-  private index = random(env.WORDART_IMAGE_URLS.split('|').length);
+  private readonly urls = env.WORDART_IMAGE_URLS.split('|');
   private readonly services = [
     'followers',
     'friends',
@@ -21,6 +21,7 @@ export class WordartService {
     'lists',
     'tweeted_at',
   ];
+  private index = random(this.urls.length);
 
   constructor(
     private readonly amqpService: AmqpService,
@@ -101,9 +102,7 @@ export class WordartService {
                 sendOpts: {
                   headers: {
                     // randomizing images
-                    image: env.WORDART_IMAGE_URLS.split('|')[
-                      this.index++ % env.WORDART_IMAGE_URLS.split('|').length
-                    ],
+                    image: this.urls[this.index++ % this.urls.length],
                     // words in csv format
                     words: data.tweeters
                       .map(item => `${item.key};${item.value}`)

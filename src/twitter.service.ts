@@ -35,7 +35,7 @@ export class TwitterService {
   ) {}
 
   // scheduled search
-  @Cron('0 */5 * * * *')
+  @Cron('0 */10 * * * *')
   private async search(searchInput?: searchRequest) {
     const {
       _id,
@@ -86,15 +86,10 @@ export class TwitterService {
         return this.search();
       }
 
-      // maximum 60 times
-      for (let i = 0, maxId; i < 60; i++) {
+      // maximum 10 times
+      for (let i = 0, maxId; i < 10; i++) {
         const request: searchRequest = {
-          count: 100,
-          lang: 'ml',
-          q: '%2A', // '*',
-          result_type: 'recent',
-          tweet_mode: 'extended',
-          ...(searchInput || {}),
+          ...(searchInput || JSON.parse(env.TWITTER_SEARCH_QUERY)),
         };
 
         // limit 100 & skip till maxId
