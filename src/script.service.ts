@@ -130,7 +130,10 @@ export class ScriptService {
                   `ScriptService/${executor.name}`,
                 );
 
-                if (has(e, 'errors') && e.errors[0].code === 88) {
+                if (
+                  has(e, 'errors') &&
+                  -1 < [88, 185].indexOf(e.errors[0].code)
+                ) {
                   ns = {
                     ...ns,
                     limit: +e._headers.get('x-rate-limit-limit'),
