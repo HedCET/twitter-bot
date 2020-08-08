@@ -130,13 +130,24 @@ export class ScriptService {
                   `ScriptService/${executor.name}`,
                 );
 
-                if (has(e, 'errors'))
+                if (has(e, 'errors')) {
                   ns = {
                     ...ns,
                     limit: +e._headers.get('x-rate-limit-limit'),
                     remaining: +e._headers.get('x-rate-limit-remaining'),
                     reset: moment(e._headers.get('x-rate-limit-reset'), ['X']),
                   };
+
+                  // statistics
+                  this.logger.log(
+                    `remaining ${ns.remaining}/${
+                      ns.limit
+                    } requests ${moment
+                      .duration(ns.reset.diff(moment()))
+                      .humanize(true)}`,
+                    `ScriptService/${executor.name}`,
+                  );
+                }
               }
             }
           }
