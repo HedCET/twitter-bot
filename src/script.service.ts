@@ -88,6 +88,7 @@ export class ScriptService {
             // executor namespace
             let ns = this.scripts[executor.name];
 
+            // iterate
             for await (const status of statuses) {
               // get tweeter
               const tweeter = await this.usersModel.findOne(
@@ -98,59 +99,25 @@ export class ScriptService {
                 ),
               );
 
-              try {
-                if (ns.remaining === 0 && ns.reset.isAfter(moment())) {
-                  this.logger.error(
-                    `skipped, remaining ${ns.remaining}/${
-                      ns.limit
-                    } requests ${moment
-                      .duration(ns.reset.diff(moment()))
-                      .humanize(true)}`,
-                    `${status.user.screen_name}/${status.id_str}`,
-                    `ScriptService/${executor.name}`,
-                  );
-                } else {
-                  this.logger.log(
-                    `${status.user.screen_name}/${status.id_str}`,
-                    `ScriptService/${executor.name}`,
-                  );
+              this.logger.log(
+                `${status.user.screen_name}/${status.id_str}`,
+                `ScriptService/${executor.name}`,
+              );
 
-                  // execute user script
-                  await ns.execute({
-                    client,
-                    executor: omit(executor, this.appProps),
-                    tweeter: tweeter,
-                    status,
-                  });
-                }
+              try {
+                // execute user script
+                await ns.execute({
+                  client,
+                  executor: omit(executor, this.appProps),
+                  tweeter: tweeter,
+                  status,
+                });
               } catch (e) {
                 this.logger.error(
                   e,
                   `${status.user.screen_name}/${status.id_str}`,
                   `ScriptService/${executor.name}`,
                 );
-
-                if (
-                  has(e, 'errors') &&
-                  -1 < [88, 185].indexOf(e.errors[0].code)
-                ) {
-                  ns = {
-                    ...ns,
-                    limit: +e._headers.get('x-rate-limit-limit'),
-                    remaining: +e._headers.get('x-rate-limit-remaining'),
-                    reset: moment(e._headers.get('x-rate-limit-reset'), ['X']),
-                  };
-
-                  // statistics
-                  this.logger.log(
-                    `remaining ${ns.remaining}/${
-                      ns.limit
-                    } requests ${moment
-                      .duration(ns.reset.diff(moment()))
-                      .humanize(true)}`,
-                    `ScriptService/${executor.name}`,
-                  );
-                }
               }
             }
           }
