@@ -104,7 +104,7 @@ export class ScriptService {
                     `skipped, remaining ${ns.remaining}/${
                       ns.limit
                     } requests ${moment
-                      .duration(ns.reset.ldiff(moment()))
+                      .duration(ns.reset.diff(moment()))
                       .humanize(true)}`,
                     `${status.user.screen_name}/${status.id_str}`,
                     `ScriptService/${executor.name}`,
