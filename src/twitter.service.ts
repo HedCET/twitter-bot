@@ -102,17 +102,18 @@ export class TwitterService {
 
         // statistics
         this.logger.log(
-          {
-            remainingMinutes: moment
-              .duration(
-                moment(response._headers.get('x-rate-limit-reset'), ['X']).diff(
-                  moment(),
-                ),
-              )
-              .asMinutes(),
-            remainingRequests: response._headers.get('x-rate-limit-remaining'),
-          },
-          'TwitterService/search',
+          `remaining ${response._headers.get(
+            'x-rate-limit-remaining',
+          )}/${response._headers.get(
+            'x-rate-limit-limit',
+          )} requests ${moment
+            .duration(
+              moment(response._headers.get('x-rate-limit-reset'), ['X']).diff(
+                moment(),
+              ),
+            )
+            .humanize(true)}`,
+          `TwitterService/search/${name}`,
         );
 
         // break if empty array

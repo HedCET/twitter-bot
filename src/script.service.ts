@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { omit } from 'lodash';
+import { has, omit } from 'lodash';
+import * as moment from 'moment';
 import { Model } from 'mongoose';
 import { throttleTime } from 'rxjs/operators';
 // import Twitter from 'twitter-lite';
@@ -21,6 +22,7 @@ export class ScriptService {
     'accessTokenSecret',
     'roles',
   ];
+  private scripts: { [key: string]: any } = {};
 
   constructor(
     private readonly logger: Logger,
@@ -28,7 +30,10 @@ export class ScriptService {
     @InjectModel(modelTokens.users)
     private readonly usersModel: Model<usersModel>,
   ) {
-    this.logger.log(Object.keys(scripts), 'ScriptService/scripts');
+    for (const key of Object.keys(scripts))
+      this.scripts[key] = {
+        execute: scripts[key],
+      };
 
     // script executor
     this.scriptMessageService.messages
@@ -45,7 +50,7 @@ export class ScriptService {
               accessRevoked: { $ne: true },
               accessTokenKey: { $exists: true },
               accessTokenSecret: { $exists: true },
-              name: { $in: Object.keys(scripts) },
+              name: { $in: Object.keys(this.scripts) },
             },
             null,
             { sort: { accessTokenValidatedAt: 'desc' } },
@@ -80,17 +85,13 @@ export class ScriptService {
               continue;
             }
 
-            for await (const status of statuses) {
-              this.logger.log(
-                `${status.user.screen_name}/${status.id_str}`,
-                `ScriptService/${executor.name}`,
-              );
+            // executor namespace
+            let ns = this.scripts[executor.name];
 
+            for await (const status of statuses) {
               // get tweeter
               const tweeter = await this.usersModel.findOne(
-                {
-                  _id: status.user.id_str,
-                },
+                { _id: status.user.id_str },
                 this.appProps.reduce(
                   (memory, value) => ({ ...memory, [value]: 0 }),
                   {},
@@ -98,19 +99,44 @@ export class ScriptService {
               );
 
               try {
-                // execute user script
-                await scripts[executor.name]({
-                  client,
-                  executor: omit(executor, this.appProps),
-                  tweeter: tweeter,
-                  status,
-                });
+                if (ns.remaining === 0 && ns.reset.isAfter(moment())) {
+                  this.logger.error(
+                    `skipped, remaining ${ns.remaining}/${
+                      ns.limit
+                    } requests ${moment
+                      .duration(ns.reset.ldiff(moment()))
+                      .humanize(true)}`,
+                    `${status.user.screen_name}/${status.id_str}`,
+                    `ScriptService/${executor.name}`,
+                  );
+                } else {
+                  this.logger.log(
+                    `${status.user.screen_name}/${status.id_str}`,
+                    `ScriptService/${executor.name}`,
+                  );
+
+                  // execute user script
+                  await ns.execute({
+                    client,
+                    executor: omit(executor, this.appProps),
+                    tweeter: tweeter,
+                    status,
+                  });
+                }
               } catch (e) {
                 this.logger.error(
                   e,
                   `${status.user.screen_name}/${status.id_str}`,
                   `ScriptService/${executor.name}`,
                 );
+
+                if (has(e, 'errors'))
+                  ns = {
+                    ...ns,
+                    limit: +e._headers.get('x-rate-limit-limit'),
+                    remaining: +e._headers.get('x-rate-limit-remaining'),
+                    reset: moment(e._headers.get('x-rate-limit-reset'), ['X']),
+                  };
               }
             }
           }
