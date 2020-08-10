@@ -22,7 +22,6 @@ export class ScriptService {
     'accessTokenSecret',
     'roles',
   ];
-  private scripts = require('./scripts');
 
   constructor(
     private readonly logger: Logger,
@@ -30,6 +29,9 @@ export class ScriptService {
     @InjectModel(modelTokens.users)
     private readonly usersModel: Model<usersModel>,
   ) {
+    const { scripts } = require('./scripts'); // import user scripts
+    this.logger.log(Object.keys(scripts), 'ScriptService/scripts');
+
     // script executor
     this.scriptMessageService.messages
       .pipe(throttleTime(1000 * 60))
@@ -45,7 +47,7 @@ export class ScriptService {
               accessRevoked: { $ne: true },
               accessTokenKey: { $exists: true },
               accessTokenSecret: { $exists: true },
-              name: { $in: Object.keys(this.scripts) },
+              name: { $in: Object.keys(scripts) },
             },
             null,
             { sort: { accessTokenValidatedAt: 'desc' } },
@@ -81,7 +83,7 @@ export class ScriptService {
             }
 
             // executor namespace
-            const ns = this.scripts[executor.name];
+            const ns = scripts[executor.name];
 
             // iterate
             for await (const status of statuses) {
@@ -97,6 +99,7 @@ export class ScriptService {
               try {
                 let skipFlag: boolean;
 
+                // skipping logic
                 if (ns.usage) {
                   const resources = uniq(
                     compact((ns.resources || '').split(',')),
@@ -152,8 +155,9 @@ export class ScriptService {
 
                 if (
                   has(e, 'errors') &&
-                  !e.errors[0].message.match(/already|duplicate/i)
+                  -1 < [88, 185].indexOf(e.errors[0].code)
                 )
+                  // update usage statistics
                   ns.usage = await client.get('application/rate_limit_status', {
                     resources: uniq(
                       compact(
