@@ -99,7 +99,7 @@ export class ScriptService {
               try {
                 let skipFlag: boolean;
 
-                // skipping logic
+                // rate limiting
                 if (ns.usage) {
                   const resources = uniq(
                     compact((ns.resources || '').split(',')),
