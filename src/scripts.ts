@@ -21,8 +21,7 @@ export const scripts = {
 
   // https://twitter.com/crawlamma
   crawlamma: {
-    resources: 'statuses/retweet', // comma separated list
-    async run({ client, executor, tweeter, status }) {
+    async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
@@ -35,8 +34,7 @@ export const scripts = {
 
   // https://twitter.com/kulukulu0033
   // kulukulu0033: {
-  //   resources: 'statuses/retweet',
-  //   async run({ client, executor, tweeter, status }) {
+  //   async execute({ client, executor, tweeter, status }) {
   //     if (
   //       executor._id !== tweeter._id &&
   //       status.full_text.match(/സ്വാമിന.*/g)
