@@ -95,42 +95,25 @@ export class ScriptService {
                 ),
               );
 
-              // execution skipping conditions
-              if (ns.reset && ns.reset.isAfter(moment()))
+              this.logger.log(
+                `${status.user.screen_name}/${status.id_str}`,
+                `ScriptService/${executor.name}`,
+              );
+
+              try {
+                // execute user script
+                await ns.execute({
+                  client,
+                  executor: omit(executor, this.appProps),
+                  tweeter: tweeter,
+                  status,
+                });
+              } catch (e) {
                 this.logger.error(
-                  `skipping, reset ${moment
-                    .duration(ns.reset.diff(moment()))
-                    .humanize(true)}`,
+                  e,
                   `${status.user.screen_name}/${status.id_str}`,
                   `ScriptService/${executor.name}`,
                 );
-              else {
-                this.logger.log(
-                  `${status.user.screen_name}/${status.id_str}`,
-                  `ScriptService/${executor.name}`,
-                );
-
-                try {
-                  // execute user script
-                  await ns.execute({
-                    client,
-                    executor: omit(executor, this.appProps),
-                    tweeter: tweeter,
-                    status,
-                  });
-                } catch (e) {
-                  this.logger.error(
-                    e,
-                    `${status.user.screen_name}/${status.id_str}`,
-                    `ScriptService/${executor.name}`,
-                  );
-
-                  if (
-                    has(e, 'errors') &&
-                    -1 < [88, 185].indexOf(e.errors[0].code)
-                  )
-                    ns.reset = moment().add(3, 'minutes'); // reset in 3 minutes
-                }
               }
             }
           }
