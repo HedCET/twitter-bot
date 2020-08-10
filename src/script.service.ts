@@ -95,7 +95,7 @@ export class ScriptService {
                 ),
               );
 
-              // execution skipping logic
+              // execution skipping conditions
               if (ns.reset && ns.reset.isAfter(moment()))
                 this.logger.error(
                   `skipping, reset ${moment
@@ -129,7 +129,7 @@ export class ScriptService {
                     has(e, 'errors') &&
                     -1 < [88, 185].indexOf(e.errors[0].code)
                   )
-                    ns.reset = moment().add(3, 'minutes'); // 3 minute skip
+                    ns.reset = moment().add(3, 'minutes'); // reset in 3 minutes
                 }
               }
             }
