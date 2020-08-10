@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { omit } from 'lodash';
+import * as regexpString from 'escape-string-regexp';
+import { compact, has, omit, uniq } from 'lodash';
+import * as moment from 'moment';
 import { Model } from 'mongoose';
 import { throttleTime } from 'rxjs/operators';
 // import Twitter from 'twitter-lite';
@@ -8,7 +10,6 @@ import { throttleTime } from 'rxjs/operators';
 import { modelTokens } from './db.models';
 import { env } from './env.validations';
 import { ScriptMessageService } from './script.message.service';
-import { scripts } from './scripts';
 import { usersModel } from './users.model';
 
 const Twitter = require('twitter-lite');
@@ -21,7 +22,7 @@ export class ScriptService {
     'accessTokenSecret',
     'roles',
   ];
-  private scripts: { [key: string]: any } = {};
+  private scripts = require('./scripts');
 
   constructor(
     private readonly logger: Logger,
@@ -29,11 +30,6 @@ export class ScriptService {
     @InjectModel(modelTokens.users)
     private readonly usersModel: Model<usersModel>,
   ) {
-    for (const key of Object.keys(scripts))
-      this.scripts[key] = {
-        execute: scripts[key],
-      };
-
     // script executor
     this.scriptMessageService.messages
       .pipe(throttleTime(1000 * 60))
@@ -85,7 +81,7 @@ export class ScriptService {
             }
 
             // executor namespace
-            let ns = this.scripts[executor.name];
+            const ns = this.scripts[executor.name];
 
             // iterate
             for await (const status of statuses) {
@@ -98,25 +94,75 @@ export class ScriptService {
                 ),
               );
 
-              this.logger.log(
-                `${status.user.screen_name}/${status.id_str}`,
-                `ScriptService/${executor.name}`,
-              );
-
               try {
-                // execute user script
-                await ns.execute({
-                  client,
-                  executor: omit(executor, this.appProps),
-                  tweeter: tweeter,
-                  status,
-                });
+                let skipFlag: boolean;
+
+                if (ns.usage) {
+                  const resources = uniq(
+                    compact((ns.resources || '').split(',')),
+                  ).map(v => new RegExp(regexpString(v), 'i'));
+
+                  for (const parent of Object.keys(ns.usage.resources || {}))
+                    for (const child of Object.keys(ns.usage.resources[parent]))
+                      for (const resource of resources)
+                        if (child.match(resource)) {
+                          const {
+                            limit,
+                            remaining,
+                            reset,
+                          } = ns.usage.resources[parent][child];
+
+                          if (
+                            remaining <= 0 &&
+                            moment(reset, ['X']).isAfter(moment())
+                          ) {
+                            skipFlag = true;
+
+                            this.logger.error(
+                              `skipping ${resource}, remaining ${remaining}/${limit} requests ${moment
+                                .duration(moment(reset, ['X']).diff(moment()))
+                                .humanize(true)}`,
+                              `${status.user.screen_name}/${status.id_str}`,
+                              `ScriptService/${executor.name}`,
+                            );
+                          }
+                        }
+                }
+
+                if (!skipFlag) {
+                  this.logger.log(
+                    `${status.user.screen_name}/${status.id_str}`,
+                    `ScriptService/${executor.name}`,
+                  );
+
+                  // execute user script
+                  await ns.run({
+                    client,
+                    executor: omit(executor, this.appProps),
+                    tweeter: tweeter,
+                    status,
+                  });
+                }
               } catch (e) {
                 this.logger.error(
                   e,
                   `${status.user.screen_name}/${status.id_str}`,
                   `ScriptService/${executor.name}`,
                 );
+
+                if (
+                  has(e, 'errors') &&
+                  !e.errors[0].message.match(/already|duplicate/i)
+                )
+                  ns.usage = await client.get('application/rate_limit_status', {
+                    resources: uniq(
+                      compact(
+                        (ns.resources || 'help')
+                          .split(',')
+                          .map(v => v.split('/')[0]),
+                      ),
+                    ),
+                  });
               }
             }
           }
