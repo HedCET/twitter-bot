@@ -53,5 +53,5 @@ export const schema = new Schema(
     tweets: Number,
     twitterApp: { ref: twitterAppsRef, type: String },
   },
-  { versionKey: false },
+  { collection: name, versionKey: false },
 );

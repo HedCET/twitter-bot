@@ -32,7 +32,7 @@ export class TwitterService {
   ) {}
 
   // scheduled search
-  // @Cron('0 */5 * * * *')
+  @Cron('0 */5 * * * *')
   private async search(query?: searchQuery) {
     // get executors
     (
@@ -70,52 +70,53 @@ export class TwitterService {
         },
         { $project: { twitterApp: 0 } },
       ])
-    ).forEach(async executor => {
-      // destructuring
-      const {
-        _id,
-        accessTokenKey: access_token_key,
-        accessTokenSecret: access_token_secret,
-        twitterApps: [
-          {
-            _id: twitterAppId,
-            consumerKey: consumer_key,
-            consumerSecret: consumer_secret,
-            tag,
-          },
-        ],
-        name,
-      } = executor;
+    )
+      .filter(executor => scripts[executor.name])
+      .forEach(async executor => {
+        // destructuring
+        const {
+          _id,
+          accessTokenKey: access_token_key,
+          accessTokenSecret: access_token_secret,
+          twitterApps: [
+            {
+              _id: twitterApp,
+              consumerKey: consumer_key,
+              consumerSecret: consumer_secret,
+              tag,
+            },
+          ],
+          name,
+        } = executor;
 
-      // twitter-lite instance
-      const client = new Twitter({
-        access_token_key,
-        access_token_secret,
-        consumer_key,
-        consumer_secret,
-      });
+        // twitter-lite instance
+        const client = new Twitter({
+          access_token_key,
+          access_token_secret,
+          consumer_key,
+          consumer_secret,
+        });
 
-      // verify credentials
-      try {
-        await client.get('account/verify_credentials');
-      } catch (e) {
-        this.logger.error(
-          e,
-          'account/verify_credentials',
-          `TwitterService/search/${name}`,
-        );
+        // verify credentials
+        try {
+          await client.get('account/verify_credentials');
+        } catch (e) {
+          this.logger.error(
+            e,
+            'account/verify_credentials',
+            `TwitterService/search/${name}`,
+          );
 
-        // accessRevoked
-        await this.usersTable.updateOne(
-          { _id },
-          { $set: { accessRevoked: true } },
-        );
+          // accessRevoked
+          await this.usersTable.updateOne(
+            { _id },
+            { $set: { accessRevoked: true } },
+          );
 
-        // continue
-        return;
-      }
+          // continue
+          return;
+        }
 
-      if (scripts[name]) {
         // executor namespace
         const ns = scripts[name];
 
@@ -174,7 +175,7 @@ export class TwitterService {
             ]);
 
             const $addToSet: { [key: string]: any } = {
-              tags: tag || twitterAppId,
+              tags: tag || twitterApp,
             };
             const $set: { [key: string]: any } = {
               createdAt: moment(status.user.created_at, [
@@ -288,7 +289,15 @@ export class TwitterService {
                 await ns.execute({
                   client,
                   executor: omit(executor, this.appProps),
-                  tweeter: tweeter,
+                  tweeter:
+                    tweeter ||
+                    (await this.usersTable.findOne(
+                      { _id: status.user.id_str },
+                      this.appProps.reduce(
+                        (memory, value) => ({ ...memory, [value]: 0 }),
+                        {},
+                      ),
+                    )),
                   status,
                 });
               } catch (e) {
@@ -304,8 +313,7 @@ export class TwitterService {
           // no newTweets break
           if (!newTweets) break;
         }
-      }
-    });
+      });
 
     const thresholdTweet = await this.tweetsTable.findOne({}, null, {
       skip: 300000,

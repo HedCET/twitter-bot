@@ -53,7 +53,7 @@ export class WordartService {
   }
 
   // populate wordart in cache
-  // @Cron('0 */15 * * * *')
+  @Cron('0 */15 * * * *')
   private async cache(key: string = '', tags: string = '') {
     if (!key)
       for await (const service of this.services) // loop

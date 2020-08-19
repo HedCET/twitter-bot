@@ -10,8 +10,8 @@ import { Model } from 'mongoose';
 
 import { env } from './env.validations';
 import {
-  model as twitterAppModel,
-  name as twitterAppToken,
+  model as twitterAppsModel,
+  name as twitterAppsToken,
 } from './twitterApps.table';
 import { model as usersModel, name as usersToken } from './users.table';
 
@@ -21,8 +21,8 @@ const Twitter = require('twitter-lite');
 export class TwitterAuthService {
   constructor(
     private readonly jwtService: JwtService,
-    @InjectModel(twitterAppToken)
-    private readonly twitterAppTable: Model<twitterAppModel>,
+    @InjectModel(twitterAppsToken)
+    private readonly twitterAppsTable: Model<twitterAppsModel>,
     @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
   ) {}
 
@@ -30,7 +30,7 @@ export class TwitterAuthService {
     const {
       consumerKey: consumer_key,
       consumerSecret: consumer_secret,
-    } = await this.twitterAppTable.findOne({ _id, deleted: { $ne: true } });
+    } = await this.twitterAppsTable.findOne({ _id, deleted: { $ne: true } });
 
     if (consumer_key && consumer_secret)
       return await new Twitter({
@@ -41,16 +41,15 @@ export class TwitterAuthService {
   }
 
   async postTwitterToken(
-    app: string = '',
-    oauth_token: string = '',
-    oauth_verifier: string = '',
+    twitterApp: string = '',
+    { oauth_token, oauth_verifier },
   ) {
     if (oauth_token && oauth_verifier) {
       const {
         consumerKey: consumer_key,
         consumerSecret: consumer_secret,
-      } = await this.twitterAppTable.findOne({
-        _id: app,
+      } = await this.twitterAppsTable.findOne({
+        _id: twitterApp,
         deleted: { $ne: true },
       });
 
@@ -69,7 +68,7 @@ export class TwitterAuthService {
           { _id },
           {
             $addToSet: { roles: 'user' },
-            $set: { accessTokenKey, accessTokenSecret, name, twitterApp: app },
+            $set: { accessTokenKey, accessTokenSecret, name, twitterApp },
             $unset: { accessRevoked: true },
           },
           { upsert: true },

@@ -22,10 +22,13 @@ export class TwitterAuthController {
 
   @Post('twitter_token')
   async postTwitterToken(
-    @Query('app') app: string = 'kandamkori',
-    @Body('oauth_token') token: string,
-    @Body('oauth_verifier') verifier: string,
+    @Query('app') app: string = 'kandamkori', //queryParam
+    @Body('oauth_token') oauth_token: string,
+    @Body('oauth_verifier') oauth_verifier: string,
   ) {
-    return this.twitterAuthService.postTwitterToken(app, token, verifier);
+    return this.twitterAuthService.postTwitterToken(app, {
+      oauth_token,
+      oauth_verifier,
+    });
   }
 }

@@ -13,5 +13,5 @@ export const schema = new Schema(
   {
     _id: { required: true, type: String },
   },
-  { versionKey: false },
+  { collection: name, versionKey: false },
 );

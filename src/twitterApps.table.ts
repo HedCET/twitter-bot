@@ -21,5 +21,5 @@ export const schema = new Schema(
     deleted: Boolean,
     tag: String,
   },
-  { versionKey: false },
+  { collection: name, versionKey: false },
 );
