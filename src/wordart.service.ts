@@ -1,7 +1,7 @@
 import { CACHE_MANAGER, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
-import { capitalize, each, find, pick, random } from 'lodash';
+import { capitalize, each, find, pick, random, shuffle } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 import { isJSON } from 'validator';
@@ -41,7 +41,7 @@ export class WordartService {
       const json = {};
 
       // metadata response
-      each(pick(cache, this.services), (value, key) => {
+      each(pick(cache, shuffle(this.services)), (value, key) => {
         json[key] = {
           hits: value.tweeters.map(tweeter => tweeter.key),
           startedAt: value.startedAt,
