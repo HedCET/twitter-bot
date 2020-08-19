@@ -29,9 +29,7 @@ export class TwitterService {
     private readonly logger: Logger,
     @InjectModel(tweetsToken) private readonly tweetsTable: Model<tweetsModel>,
     @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
-  ) {
-    this.search();
-  }
+  ) {}
 
   // scheduled search
   @Cron('0 */5 * * * *')
