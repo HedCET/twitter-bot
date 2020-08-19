@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { omit, sortBy } from 'lodash';
+import { fromPairs, has, map, omit, sortBy } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
@@ -29,7 +29,9 @@ export class TwitterService {
     private readonly logger: Logger,
     @InjectModel(tweetsToken) private readonly tweetsTable: Model<tweetsModel>,
     @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
-  ) {}
+  ) {
+    this.search();
+  }
 
   // scheduled search
   @Cron('0 */5 * * * *')
@@ -213,10 +215,7 @@ export class TwitterService {
             // existing tweeter
             const tweeter = await this.usersTable.findOne(
               { _id: status.user.id_str },
-              this.appProps.reduce(
-                (memory, value) => ({ ...memory, [value]: 0 }),
-                {},
-              ),
+              fromPairs(map(this.appProps, i => [i, 0])),
             );
 
             if (tweeter && tweetedAt.isAfter(tweeter.tweetedAt)) {
@@ -279,33 +278,47 @@ export class TwitterService {
                 _id: `${status.id_str}|${_id}`,
               }).save();
 
-              this.logger.log(
-                `${status.user.screen_name}/${status.id_str}`,
-                `TwitterService/search/${name}`,
-              );
-
-              try {
-                // execute script
-                await ns.execute({
-                  client,
-                  executor: omit(executor, this.appProps),
-                  tweeter:
-                    tweeter ||
-                    (await this.usersTable.findOne(
-                      { _id: status.user.id_str },
-                      this.appProps.reduce(
-                        (memory, value) => ({ ...memory, [value]: 0 }),
-                        {},
-                      ),
-                    )),
-                  status,
-                });
-              } catch (e) {
+              if (
+                moment.isMoment(ns.reset) &&
+                moment(ns.reset).isAfter(moment())
+              )
                 this.logger.error(
-                  e,
+                  `skipping, reset ${moment
+                    .duration(ns.reset.diff(moment()))
+                    .humanize(true)}`,
                   `${status.user.screen_name}/${status.id_str}`,
                   `TwitterService/search/${name}`,
                 );
+              else {
+                this.logger.log(
+                  `${status.user.screen_name}/${status.id_str}`,
+                  `TwitterService/search/${name}`,
+                );
+
+                try {
+                  // execute script
+                  const res = await ns.execute({
+                    client,
+                    executor: omit(executor, this.appProps),
+                    tweeter:
+                      tweeter ||
+                      (await this.usersTable.findOne(
+                        { _id: status.user.id_str },
+                        fromPairs(map(this.appProps, i => [i, 0])),
+                      )),
+                    status,
+                  });
+                } catch (e) {
+                  this.logger.error(
+                    e,
+                    `${status.user.screen_name}/${status.id_str}`,
+                    `TwitterService/search/${name}`,
+                  );
+
+                  // 3 minutes skipping
+                  if (has(e, 'errors') && -1 < [185].indexOf(e.errors[0].code))
+                    ns.reset = moment().add(3, 'minutes');
+                }
               }
             }
           }
