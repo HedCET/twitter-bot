@@ -28,19 +28,13 @@ export class AppController {
 
   @Get('search')
   @UseInterceptors(CacheInterceptor)
-  async search(
-    @Query('query') query: string = '',
-    @Query('tags') tags: string = 'malayalam',
-  ) {
-    return await this.appService.search(query, tags);
+  async search(@Query('query') query: string, @Query('tags') tags: string) {
+    return await this.appService.search(query || '', tags || 'malayalam');
   }
 
   @Get('wordart')
-  async wordart(
-    @Query('key') key: string = '',
-    @Query('tags') tags: string = 'malayalam',
-  ) {
-    return this.wordartService.wordart(key, tags);
+  async wordart(@Query('key') key: string, @Query('tags') tags: string) {
+    return this.wordartService.wordart(key || '', tags || 'malayalam');
   }
 
   @Get('user')
