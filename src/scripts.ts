@@ -69,8 +69,8 @@ export const scripts = {
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
       ) {
-        await new Promise(r => setTimeout(r, 1000 * 10));
-        await client.post('statuses/retweet', { id: status.id_str });
+        // await new Promise(r => setTimeout(r, 1000 * 10));
+        // await client.post('statuses/retweet', { id: status.id_str });
       }
     },
 
