@@ -27,7 +27,7 @@ export const scripts = {
         (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
       ) {
         await new Promise(r => setTimeout(r, 1000 * 10)); // delay 10 seconds
-        await client.post('statuses/retweet', { id: status.id_str });
+        return await client.post('statuses/retweet', { id: status.id_str });
       }
     },
 
@@ -63,23 +63,23 @@ export const scripts = {
   // },
 
   // https://twitter.com/kuklamma
-  kuklamma: {
-    async execute({ client, executor, tweeter, status }) {
-      if (
-        executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
-      ) {
-        // await new Promise(r => setTimeout(r, 1000 * 10));
-        // await client.post('statuses/retweet', { id: status.id_str });
-      }
-    },
+  // kuklamma: {
+  //   async execute({ client, executor, tweeter, status }) {
+  //     if (
+  //       executor._id !== tweeter._id &&
+  //       (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
+  //     ) {
+  //       await new Promise(r => setTimeout(r, 1000 * 10));
+  //       return await client.post('statuses/retweet', { id: status.id_str });
+  //     }
+  //   },
 
-    searchQuery: {
-      count: 100,
-      lang: 'ta',
-      q: '%2A',
-      result_type: 'recent',
-      tweet_mode: 'extended',
-    },
-  },
+  //   searchQuery: {
+  //     count: 100,
+  //     lang: 'ta',
+  //     q: '%2A',
+  //     result_type: 'recent',
+  //     tweet_mode: 'extended',
+  //   },
+  // },
 };
