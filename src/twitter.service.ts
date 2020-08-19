@@ -2,68 +2,97 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { find, omit, sortBy } from 'lodash';
+import { omit, sortBy } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
 
-import { modelTokens } from './db.models';
-import { env } from './env.validations';
-import { ScriptMessageService } from './script.message.service';
-import { tweetsModel } from './tweets.model';
-import { searchRequest, tweetInterface } from './twitter.interface';
-import { usersModel } from './users.model';
+import { scripts } from './scripts';
+import { model as tweetsModel, name as tweetsToken } from './tweets.table';
+import { searchQuery, tweetInterface } from './twitter.interface';
+import { model as usersModel, name as usersToken } from './users.table';
 
 const Twitter = require('twitter-lite');
 
 @Injectable()
 export class TwitterService {
-  // private readonly appProps = [
-  //   'accessRevoked',
-  //   'accessTokenKey',
-  //   'accessTokenSecret',
-  //   'roles',
-  // ];
+  private readonly appProps = [
+    'accessRevoked',
+    'accessTokenKey',
+    'accessTokenSecret',
+    'roles',
+    'twitterApp',
+    'twitterApps',
+  ];
 
   constructor(
     private readonly logger: Logger,
-    private readonly scriptMessageService: ScriptMessageService,
-    @InjectModel(modelTokens.tweets)
-    private readonly tweetsModel: Model<tweetsModel>,
-    @InjectModel(modelTokens.users)
-    private readonly usersModel: Model<usersModel>,
+    @InjectModel(tweetsToken) private readonly tweetsTable: Model<tweetsModel>,
+    @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
   ) {}
 
   // scheduled search
-  @Cron('0 */5 * * * *')
-  private async search(searchInput?: searchRequest) {
-    const {
-      _id,
-      accessTokenKey: access_token_key,
-      accessTokenSecret: access_token_secret,
-      name,
-    } = await this.usersModel.findOne(
-      {
-        accessRevoked: { $ne: true },
-        accessTokenKey: { $exists: true },
-        accessTokenSecret: { $exists: true },
-      },
-      { _id: 1, accessTokenKey: 1, accessTokenSecret: 1, name: 1 },
-      { sort: { accessTokenValidatedAt: 'asc' } },
-    );
+  // @Cron('0 */5 * * * *')
+  private async search(query?: searchQuery) {
+    // get executors
+    (
+      await this.usersTable.aggregate([
+        {
+          $match: {
+            accessRevoked: { $ne: true },
+            accessTokenKey: { $exists: true },
+            accessTokenSecret: { $exists: true },
+            twitterApp: { $exists: true },
+          },
+        },
+        {
+          $lookup: {
+            from: 'twitterApps',
+            let: { app: '$twitterApp' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $ne: ['$deleted', true] },
+                      { $eq: ['$$app', '$_id'] },
+                    ],
+                  },
+                },
+              },
+              // { $project: { tag: 0 } },
+            ],
+            as: 'twitterApps',
+          },
+        },
+        {
+          $match: { twitterApps: { $elemMatch: { deleted: { $ne: true } } } },
+        },
+        { $project: { twitterApp: 0 } },
+      ])
+    ).forEach(async executor => {
+      // destructuring
+      const {
+        _id,
+        accessTokenKey: access_token_key,
+        accessTokenSecret: access_token_secret,
+        twitterApps: [
+          {
+            _id: twitterAppId,
+            consumerKey: consumer_key,
+            consumerSecret: consumer_secret,
+            tag,
+          },
+        ],
+        name,
+      } = executor;
 
-    if (_id) {
-      // update accessTokenValidatedAt
-      await this.usersModel.updateOne(
-        { _id },
-        { $set: { accessTokenValidatedAt: moment().toDate() } },
-      );
-
+      // twitter-lite instance
       const client = new Twitter({
         access_token_key,
         access_token_secret,
-        consumer_key: env.TWITTER_CONSUMER_KEY,
-        consumer_secret: env.TWITTER_CONSUMER_SECRET,
+        consumer_key,
+        consumer_secret,
       });
 
       // verify credentials
@@ -72,210 +101,226 @@ export class TwitterService {
       } catch (e) {
         this.logger.error(
           e,
-          `account/verify_credentials/${name}`,
-          'TwitterService/search',
+          'account/verify_credentials',
+          `TwitterService/search/${name}`,
         );
 
         // accessRevoked
-        await this.usersModel.updateOne(
+        await this.usersTable.updateOne(
           { _id },
           { $set: { accessRevoked: true } },
         );
 
-        // recursive
-        return this.search();
+        // continue
+        return;
       }
 
-      // maximum 10 times
-      for (let i = 0, maxId; i < 10; i++) {
-        const request: searchRequest = {
-          ...(searchInput || JSON.parse(env.TWITTER_SEARCH_QUERY)),
-        };
+      if (scripts[name]) {
+        // executor namespace
+        const ns = scripts[name];
 
-        // limit 100 & skip till maxId
-        if (maxId) request.max_id = maxId;
-
-        const response: {
-          _headers: { [key: string]: any };
-          statuses: tweetInterface[];
-        } = await client.get('search/tweets', request);
-
-        // statistics
-        this.logger.log(
-          `remaining ${response._headers.get(
-            'x-rate-limit-remaining',
-          )}/${response._headers.get(
-            'x-rate-limit-limit',
-          )} requests ${moment
-            .duration(
-              moment(response._headers.get('x-rate-limit-reset'), ['X']).diff(
-                moment(),
-              ),
-            )
-            .humanize(true)}`,
-          `TwitterService/search/${name}`,
-        );
-
-        // break if empty array
-        if (!response.statuses.length) break;
-
-        // ascending sort
-        const statuses = sortBy(response.statuses, [
-          status =>
-            `${moment(status.created_at, [
-              'ddd MMM D HH:mm:ss ZZ YYYY',
-            ]).toISOString()}|${status.id_str}`,
-        ]);
-
-        // set maxId for next iteration
-        maxId = BigInt(statuses[0].id_str)
-          .subtract(1)
-          .toString();
-
-        // new tweets counter
-        let newTweets = 0;
-
-        for await (const status of statuses) {
-          const tweetedAt = moment(status.created_at, [
-            'ddd MMM D HH:mm:ss ZZ YYYY',
-          ]);
-          const $unset: { [key: string]: any } = {};
-          const $set: { [key: string]: any } = {
-            createdAt: moment(status.user.created_at, [
-              'ddd MMM D HH:mm:ss ZZ YYYY',
-            ]).toDate(),
-            name: status.user.screen_name,
-            tweetedAt,
+        // maximum 10 times
+        for (let i = 0, maxId; i < 10; i++) {
+          const requestQuery: searchQuery = {
+            ...(query || ns.searchQuery),
           };
 
-          // followers
-          if (status.user.followers_count)
-            $set.followers = status.user.followers_count;
-          else $unset.followers = true;
+          // limit 100 & skip till maxId
+          if (maxId) requestQuery.max_id = maxId;
 
-          // friends
-          if (status.user.friends_count)
-            $set.friends = status.user.friends_count;
-          else $unset.friends = true;
+          const response: {
+            _headers: { [key: string]: any };
+            statuses: tweetInterface[];
+          } = await client.get('search/tweets', requestQuery);
 
-          // likes
-          if (status.user.favourites_count)
-            $set.likes = status.user.favourites_count;
-          else $unset.likes = true;
-
-          // lists
-          if (status.user.listed_count) $set.lists = status.user.listed_count;
-          else $unset.lists = true;
-
-          // tweets
-          if (status.user.statuses_count)
-            $set.tweets = status.user.statuses_count;
-          else $unset.tweets = true;
-
-          // existing users
-          const users = await this.usersModel.find(
-            {
-              _id: { $in: [status.user.id_str, status.user.screen_name] },
-            },
-            null,
-            // this.appProps.reduce(
-            //   (memory, value) => ({ ...memory, [value]: 0 }),
-            //   {},
-            // ),
-            { sort: { tweetedAt: 'asc' } },
+          // statistics
+          this.logger.log(
+            `remaining ${response._headers.get(
+              'x-rate-limit-remaining',
+            )}/${response._headers.get(
+              'x-rate-limit-limit',
+            )} requests ${moment
+              .duration(
+                moment(response._headers.get('x-rate-limit-reset'), ['X']).diff(
+                  moment(),
+                ),
+              )
+              .humanize(true)}`,
+            `TwitterService/search/${name}`,
           );
 
-          if (users.length) {
-            const user = users
-              .map(v => v.toObject())
-              .reduce((memory, value) => ({ ...memory, ...value }), {});
+          // break if empty array
+          if (!response.statuses.length) break;
 
-            // migrate _id from screen_name to id_str
-            if (
-              1 < users.length ||
-              find(users, { _id: status.user.screen_name })
-            ) {
-              await this.usersModel.deleteOne({ _id: status.user.screen_name });
-              await this.usersModel.updateOne(
-                { _id: status.user.id_str },
-                { $set: omit(user, ['_id']) },
-                { upsert: true },
-              );
-            }
+          // ascending sort
+          const statuses = sortBy(response.statuses, [
+            status =>
+              `${moment(status.created_at, [
+                'ddd MMM D HH:mm:ss ZZ YYYY',
+              ]).toISOString()}|${status.id_str}`,
+          ]);
 
-            if (tweetedAt.isAfter(user.tweetedAt)) {
+          // set maxId for next iteration
+          maxId = BigInt(statuses[0].id_str)
+            .subtract(1)
+            .toString();
+
+          // new tweets counter
+          let newTweets = 0;
+
+          for await (const status of statuses) {
+            const tweetedAt = moment(status.created_at, [
+              'ddd MMM D HH:mm:ss ZZ YYYY',
+            ]);
+
+            const $addToSet: { [key: string]: any } = {
+              tags: tag || twitterAppId,
+            };
+            const $set: { [key: string]: any } = {
+              createdAt: moment(status.user.created_at, [
+                'ddd MMM D HH:mm:ss ZZ YYYY',
+              ]).toDate(),
+              name: status.user.screen_name,
+              tweetedAt,
+            };
+            const $unset: { [key: string]: any } = {};
+
+            // followers
+            if (status.user.followers_count)
+              $set.followers = status.user.followers_count;
+            else $unset.followers = true;
+
+            // friends
+            if (status.user.friends_count)
+              $set.friends = status.user.friends_count;
+            else $unset.friends = true;
+
+            // likes
+            if (status.user.favourites_count)
+              $set.likes = status.user.favourites_count;
+            else $unset.likes = true;
+
+            // lists
+            if (status.user.listed_count) $set.lists = status.user.listed_count;
+            else $unset.lists = true;
+
+            // tweets
+            if (status.user.statuses_count)
+              $set.tweets = status.user.statuses_count;
+            else $unset.tweets = true;
+
+            // existing tweeter
+            const tweeter = await this.usersTable.findOne(
+              { _id: status.user.id_str },
+              this.appProps.reduce(
+                (memory, value) => ({ ...memory, [value]: 0 }),
+                {},
+              ),
+            );
+
+            if (tweeter && tweetedAt.isAfter(tweeter.tweetedAt)) {
               // tweet frequency per day
               $set.tweetFrequency = moment
-                .duration(tweetedAt.diff(user.tweetedAt))
+                .duration(tweetedAt.diff(tweeter.tweetedAt))
                 .asDays();
 
               // average followers per day
               if (
-                user.followers &&
-                status.user.followers_count !== user.followers
+                tweeter.followers &&
+                status.user.followers_count !== tweeter.followers
               )
                 $set.averageFollowers =
-                  (status.user.followers_count - user.followers) /
+                  (status.user.followers_count - tweeter.followers) /
                   $set.tweetFrequency;
 
               // average friends per day
-              if (user.friends && status.user.friends_count !== user.friends)
+              if (
+                tweeter.friends &&
+                status.user.friends_count !== tweeter.friends
+              )
                 $set.averageFriends =
-                  (status.user.friends_count - user.friends) /
+                  (status.user.friends_count - tweeter.friends) /
                   $set.tweetFrequency;
 
               // average likes per day
-              if (user.likes && status.user.favourites_count !== user.likes)
+              if (
+                tweeter.likes &&
+                status.user.favourites_count !== tweeter.likes
+              )
                 $set.averageLikes =
-                  (status.user.favourites_count - user.likes) /
+                  (status.user.favourites_count - tweeter.likes) /
                   $set.tweetFrequency;
 
               // average lists per day
-              if (user.lists && status.user.listed_count !== user.lists)
+              if (tweeter.lists && status.user.listed_count !== tweeter.lists)
                 $set.averageLists =
-                  (status.user.listed_count - user.lists) / $set.tweetFrequency;
+                  (status.user.listed_count - tweeter.lists) /
+                  $set.tweetFrequency;
+            }
+
+            // upsert
+            await this.usersTable.updateOne(
+              { _id: status.user.id_str },
+              { $addToSet, $set, $unset },
+              { upsert: true },
+            );
+
+            // new tweet identification logic
+            const tweet = await this.tweetsTable.findOne({
+              _id: `${status.id_str}|${_id}`,
+            });
+
+            if (!tweet) {
+              newTweets++;
+
+              // persistent store
+              await new this.tweetsTable({
+                _id: `${status.id_str}|${_id}`,
+              }).save();
+
+              this.logger.log(
+                `${status.user.screen_name}/${status.id_str}`,
+                `TwitterService/search/${name}`,
+              );
+
+              try {
+                // execute script
+                await ns.execute({
+                  client,
+                  executor: omit(executor, this.appProps),
+                  tweeter: tweeter,
+                  status,
+                });
+              } catch (e) {
+                this.logger.error(
+                  e,
+                  `${status.user.screen_name}/${status.id_str}`,
+                  `TwitterService/search/${name}`,
+                );
+              }
             }
           }
 
-          // upsert
-          await this.usersModel.updateOne(
-            { _id: status.user.id_str },
-            { $set, $unset },
-            { upsert: true },
-          );
-
-          // new tweet finder
-          const tweet = await this.tweetsModel.findOne({
-            _id: status.id_str,
-          });
-
-          if (!tweet) {
-            newTweets++;
-            await new this.tweetsModel({ _id: status.id_str }).save();
-            this.scriptMessageService.addMessage(status); // publish to RxJS message stream
-          }
+          // no newTweets break
+          if (!newTweets) break;
         }
-
-        // no newTweets break
-        if (!newTweets) break;
-
-        // wait before next iteration
-        await new Promise(r => setTimeout(r, 1000 * 10));
       }
-    }
+    });
 
-    const thresholdTweet = await this.tweetsModel.findOne({}, null, {
-      skip: 100000,
+    const thresholdTweet = await this.tweetsTable.findOne({}, null, {
+      skip: 300000,
       sort: { _id: 'desc' },
     });
 
     if (thresholdTweet)
-      await this.tweetsModel.deleteMany({ _id: { $lte: thresholdTweet._id } });
+      await this.tweetsTable.deleteMany({ _id: { $lte: thresholdTweet._id } });
 
-    const usersModelStats = await this.usersModel.collection.stats();
-
-    if (384 * 1024 * 1024 < usersModelStats.storageSize)
-      await this.usersModel.deleteMany({
+    // clear inactive users
+    if (
+      15 * 1024 * 1024 * 1024 <
+      (await this.usersTable.collection.stats()).storageSize
+    )
+      await this.usersTable.deleteMany({
         roles: { $size: 0 },
         tweeted_at: {
           $lt: moment()

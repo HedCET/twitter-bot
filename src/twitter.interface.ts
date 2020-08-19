@@ -1,4 +1,4 @@
-export interface searchRequest {
+export interface searchQuery {
   count: number;
   lang: string;
   max_id?: string;

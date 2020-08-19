@@ -17,7 +17,7 @@ export const scripts = {
   //      tweetFrequency?: Number;
   //      tweets?: Number;
   //   }
-  // status[Object] => https://developer.twitter.com/en/docs/tweets/data-dictionary/overview/intro-to-tweet-json
+  // status[Object] => https://developer.twitter.com/en/docs/twitter-api/v1/data-dictionary/overview/intro-to-tweet-json
 
   // https://twitter.com/crawlamma
   crawlamma: {
@@ -29,6 +29,15 @@ export const scripts = {
         await client.post('statuses/retweet', { id: status.id_str });
         await new Promise(r => setTimeout(r, 1000 * 10)); // delay 10 seconds
       }
+    },
+
+    // search/tweets => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/search/api-reference/get-search-tweets
+    searchQuery: {
+      count: 100,
+      lang: 'ml',
+      q: '%2A', // '*',
+      result_type: 'recent',
+      tweet_mode: 'extended',
     },
   },
 
@@ -42,6 +51,14 @@ export const scripts = {
   //       await client.post('statuses/retweet', { id: status.id_str });
   //       await new Promise(r => setTimeout(r, 1000 * 10));
   //     }
+  //   },
+
+  //   searchQuery: {
+  //     count: 100,
+  //     lang: 'ml',
+  //     q: '%2A',
+  //     result_type: 'recent',
+  //     tweet_mode: 'extended',
   //   },
   // },
 };

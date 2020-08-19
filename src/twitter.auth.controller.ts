@@ -6,9 +6,9 @@ import { TwitterAuthService } from './twitter.auth.service';
 export class TwitterAuthController {
   constructor(private readonly twitterAuthService: TwitterAuthService) {}
 
-  @Get('twitter_request_token')
-  async twitterRequestToken() {
-    return this.twitterAuthService.twitterRequestToken();
+  @Get('twitter_token')
+  async getTwitterToken(@Query('app') app: string = 'kandamkori') {
+    return this.twitterAuthService.getTwitterToken(app);
   }
 
   // to test twitter callback
@@ -20,14 +20,12 @@ export class TwitterAuthController {
     return { oauth_token, oauth_verifier };
   }
 
-  @Post('twitter_access_token')
-  async twitterAccessToken(
-    @Body('oauth_token') oauth_token: string,
-    @Body('oauth_verifier') oauth_verifier: string,
+  @Post('twitter_token')
+  async postTwitterToken(
+    @Query('app') app: string = 'kandamkori',
+    @Body('oauth_token') token: string,
+    @Body('oauth_verifier') verifier: string,
   ) {
-    return this.twitterAuthService.twitterAccessToken(
-      oauth_token,
-      oauth_verifier,
-    );
+    return this.twitterAuthService.postTwitterToken(app, token, verifier);
   }
 }

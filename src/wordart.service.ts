@@ -7,9 +7,8 @@ import { Model } from 'mongoose';
 import { isJSON } from 'validator';
 
 import { AmqpService } from './amqp.service';
-import { modelTokens } from './db.models';
 import { env } from './env.validations';
-import { usersModel } from './users.model';
+import { model, name } from './users.table';
 
 @Injectable()
 export class WordartService {
@@ -27,26 +26,25 @@ export class WordartService {
     private readonly amqpService: AmqpService,
     @Inject(CACHE_MANAGER) private readonly cacheManager,
     private readonly logger: Logger,
-    @InjectModel(modelTokens.users)
-    private readonly usersModel: Model<usersModel>,
+    @InjectModel(name) private readonly usersTable: Model<model>,
   ) {}
 
   // wordart route handler
-  async wordart(key: string = '') {
+  async wordart(key: string = '', tags: string = '') {
     // custom cache handler
-    let _wordart = await this.cacheManager.get('_wordart');
-    if (!_wordart) _wordart = await this._wordart();
+    let cache = await this.cacheManager.get(`wordart|${tags}`);
+    if (!cache) cache = await this.cache(key, tags);
 
-    if (key && -1 < this.services.indexOf(key) && _wordart[key])
-      return _wordart[key].wordart;
+    if (key && -1 < this.services.indexOf(key) && cache[key])
+      return cache[key].wordart;
     else {
       const json = {};
 
       // metadata response
-      each(pick(_wordart, this.services), (value, key) => {
+      each(pick(cache, this.services), (value, key) => {
         json[key] = {
           hits: value.tweeters.map(tweeter => tweeter.key),
-          startAt: value.startAt,
+          startedAt: value.startedAt,
         };
       });
 
@@ -55,21 +53,22 @@ export class WordartService {
   }
 
   // populate wordart in cache
-  @Cron('0 */15 * * * *')
-  private async _wordart(key: string = '') {
+  // @Cron('0 */15 * * * *')
+  private async cache(key: string = '', tags: string = '') {
     if (!key)
-      for await (const service of this.services) await this._wordart(service);
+      for await (const service of this.services) // loop
+        await this.cache(service, tags || 'malayalam');
 
     if (-1 < this.services.indexOf(key)) {
       const data = {
-        startAt: moment().toISOString(),
+        startedAt: moment().toISOString(),
         tweeters: [],
         wordart: {},
       };
 
       // iterate max 24 times (6 hours) or at-least 10 tweeters
       for (let i = 0; data.tweeters.length < 10 && i < 24; i++) {
-        data.startAt = moment(data.startAt)
+        data.startedAt = moment(data.startedAt)
           .subtract((i + 1) * 15, 'minutes')
           .toISOString();
 
@@ -77,10 +76,13 @@ export class WordartService {
           key === 'tweeted_at' ? 'tweetFrequency' : `average${capitalize(key)}`;
 
         // dynamic projection
-        const users = await this.usersModel.find(
-          { tweetedAt: { $gte: data.startAt } },
+        const users = await this.usersTable.find(
+          {
+            tags: { $in: tags.split('|') },
+            tweetedAt: { $gte: data.startedAt },
+          },
           { name: 1, [prop]: 1 },
-          { limit: 200, sort: { tweetedAt: 'desc' } },
+          { limit: 90, sort: { tweetedAt: 'desc' } },
         );
 
         for (const user of users)
@@ -130,14 +132,14 @@ export class WordartService {
 
               // custom caching
               this.cacheManager.set(
-                '_wordart',
+                `wordart|${tags}`,
                 {
-                  ...((await this.cacheManager.get('_wordart')) || {}),
+                  ...((await this.cacheManager.get(`wordart|${tags}`)) || {}),
                   [key]: data,
                 },
                 { ttl: 0 }, // infinitely
               );
-            } else await this._wordart(key);
+            } else await this.cache(key);
           } else
             this.logger.error(
               content,
@@ -148,6 +150,6 @@ export class WordartService {
       }
     }
 
-    return (await this.cacheManager.get('_wordart')) || {};
+    return (await this.cacheManager.get(`wordart|${tags}`)) || {};
   }
 }

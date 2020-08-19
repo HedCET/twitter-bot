@@ -28,13 +28,19 @@ export class AppController {
 
   @Get('search')
   @UseInterceptors(CacheInterceptor)
-  async search(@Query('query') query: string = '') {
-    return await this.appService.search(query);
+  async search(
+    @Query('query') query: string = '',
+    @Query('tags') tags: string = 'malayalam',
+  ) {
+    return await this.appService.search(query, tags);
   }
 
   @Get('wordart')
-  async wordart(@Query('key') key: string = '') {
-    return this.wordartService.wordart(key);
+  async wordart(
+    @Query('key') key: string = '',
+    @Query('tags') tags: string = 'malayalam',
+  ) {
+    return this.wordartService.wordart(key, tags);
   }
 
   @Get('user')
