@@ -26,8 +26,8 @@ export const scripts = {
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
       ) {
-        await client.post('statuses/retweet', { id: status.id_str });
         await new Promise(r => setTimeout(r, 1000 * 10)); // delay 10 seconds
+        await client.post('statuses/retweet', { id: status.id_str });
       }
     },
 
@@ -41,15 +41,15 @@ export const scripts = {
     },
   },
 
-  // https://twitter.com/kulukulu0033
+  // // https://twitter.com/kulukulu0033
   // kulukulu0033: {
   //   async execute({ client, executor, tweeter, status }) {
   //     if (
   //       executor._id !== tweeter._id &&
   //       status.full_text.match(/സ്വാമിന.*/g)
   //     ) {
-  //       await client.post('statuses/retweet', { id: status.id_str });
   //       await new Promise(r => setTimeout(r, 1000 * 10));
+  //       await client.post('statuses/retweet', { id: status.id_str });
   //     }
   //   },
 
@@ -69,8 +69,8 @@ export const scripts = {
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
       ) {
+        await new Promise(r => setTimeout(r, 1000 * 10));
         await client.post('statuses/retweet', { id: status.id_str });
-        await new Promise(r => setTimeout(r, 1000 * 10)); // delay 10 seconds
       }
     },
 
