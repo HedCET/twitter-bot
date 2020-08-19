@@ -315,9 +315,9 @@ export class TwitterService {
                     `TwitterService/search/${name}`,
                   );
 
-                  // 3 minutes skipping
+                  // skipping logic
                   if (has(e, 'errors') && -1 < [185].indexOf(e.errors[0].code))
-                    ns.reset = moment().add(3, 'minutes');
+                    ns.reset = moment().add(5, 'minutes'); // 5 minutes
                 }
               }
             }
