@@ -43,7 +43,7 @@ import { WordartService } from './wordart.service';
     ]),
     JwtModule.register({ secret: env.SECRET }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    CacheModule.register({ max: 1000 * 60, ttl: 600 }),
+    CacheModule.register({ max: 1000 * 60, ttl: 3600 }),
     ScheduleModule.forRoot(),
   ],
   providers: [
