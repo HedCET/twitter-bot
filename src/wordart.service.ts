@@ -1,6 +1,6 @@
 import { CACHE_MANAGER, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Cron } from '@nestjs/schedule';
+// import { Cron } from '@nestjs/schedule';
 import { capitalize, each, find, pick, random, shuffle } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
@@ -53,7 +53,7 @@ export class WordartService {
   }
 
   // populate wordart in cache
-  @Cron('0 */15 * * * *')
+  // @Cron('0 */15 * * * *')
   private async cache(key: string = '', tags: string = '') {
     if (!key)
       for await (const service of this.services) // loop
