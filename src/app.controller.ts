@@ -33,6 +33,7 @@ export class AppController {
   }
 
   @Get('wordart')
+  @UseInterceptors(CacheInterceptor)
   async wordart(@Query('key') key: string, @Query('tags') tags: string) {
     return this.wordartService.wordart(key || '', tags || 'malayalam');
   }

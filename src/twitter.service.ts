@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { fromPairs, has, map, omit, sortBy } from 'lodash';
+import { fromPairs, has, omit, sortBy } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
@@ -22,7 +22,6 @@ export class TwitterService {
     'accessTokenSecret',
     'roles',
     'twitterApp',
-    'twitterApps',
   ];
 
   constructor(
@@ -36,56 +35,28 @@ export class TwitterService {
   private async search(query?: searchQuery) {
     // get executors
     (
-      await this.usersTable.aggregate([
-        {
-          $match: {
-            accessRevoked: { $ne: true },
-            accessTokenKey: { $exists: true },
-            accessTokenSecret: { $exists: true },
-            twitterApp: { $exists: true },
-          },
-        },
-        {
-          $lookup: {
-            from: 'twitterApps',
-            let: { app: '$twitterApp' },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [
-                      { $ne: ['$deleted', true] },
-                      { $eq: ['$$app', '$_id'] },
-                    ],
-                  },
-                },
-              },
-              // { $project: { tag: 0 } },
-            ],
-            as: 'twitterApps',
-          },
-        },
-        {
-          $match: { twitterApps: { $elemMatch: { deleted: { $ne: true } } } },
-        },
-        { $project: { twitterApp: 0 } },
-      ])
+      await this.usersTable
+        .find({
+          accessRevoked: { $ne: true },
+          accessTokenKey: { $exists: true },
+          accessTokenSecret: { $exists: true },
+          twitterApp: { $exists: true },
+        })
+        .populate({ path: 'twitterApp', match: { deleted: { $ne: true } } })
     )
-      .filter(executor => scripts[executor.name])
+      .filter(executor => executor.twitterApp && scripts[executor.name])
       .forEach(async executor => {
         // destructuring
         const {
           _id,
           accessTokenKey: access_token_key,
           accessTokenSecret: access_token_secret,
-          twitterApps: [
-            {
-              _id: twitterApp,
-              consumerKey: consumer_key,
-              consumerSecret: consumer_secret,
-              tag,
-            },
-          ],
+          twitterApp: {
+            _id: twitterApp,
+            consumerKey: consumer_key,
+            consumerSecret: consumer_secret,
+            tag,
+          },
           name,
         } = executor;
 
@@ -213,7 +184,7 @@ export class TwitterService {
             // existing tweeter
             const tweeter = await this.usersTable.findOne(
               { _id: status.user.id_str },
-              fromPairs(map(this.appProps, i => [i, 0])),
+              fromPairs(this.appProps.map(i => [i, 0])),
             );
 
             if (tweeter && tweetedAt.isAfter(tweeter.tweetedAt)) {
@@ -302,7 +273,7 @@ export class TwitterService {
                       tweeter ||
                       (await this.usersTable.findOne(
                         { _id: status.user.id_str },
-                        fromPairs(map(this.appProps, i => [i, 0])),
+                        fromPairs(this.appProps.map(i => [i, 0])),
                       )),
                     status,
                   });
@@ -336,7 +307,7 @@ export class TwitterService {
 
     // clear inactive users
     if (
-      15 * 1024 * 1024 * 1024 <
+      16 * 1024 * 1024 * 1024 <
       (await this.usersTable.collection.stats()).storageSize
     )
       await this.usersTable.deleteMany({

@@ -1,14 +1,17 @@
-import { CACHE_MANAGER, Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-// import { Cron } from '@nestjs/schedule';
-import { capitalize, each, find, pick, random, shuffle } from 'lodash';
+import { capitalize, find, pick, random, shuffle } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 import { isJSON } from 'validator';
 
 import { AmqpService } from './amqp.service';
+import {
+  model as cachedWordArtsModel,
+  name as cachedWordArtsToken,
+} from './cachedWordArts.table';
 import { env } from './env.validations';
-import { model, name } from './users.table';
+import { model as usersModel, name as usersToken } from './users.table';
 
 @Injectable()
 export class WordartService {
@@ -24,51 +27,71 @@ export class WordartService {
 
   constructor(
     private readonly amqpService: AmqpService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager,
+    @InjectModel(cachedWordArtsToken)
+    private readonly cachedWordArtsTable: Model<cachedWordArtsModel>,
     private readonly logger: Logger,
-    @InjectModel(name) private readonly usersTable: Model<model>,
+    @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
   ) {}
 
   // wordart route handler
   async wordart(key: string = '', tags: string = '') {
-    // custom cache handler
-    let cache = await this.cacheManager.get(`wordart|${tags}`);
-    if (!cache) cache = await this.cache(key, tags);
+    const cachedWordArts = await this.cachedWordArtsTable.find(
+      { _id: { $in: this.services.map(i => `${i}|${tags}`) } },
+      { stringifiedJSON: 0 },
+    );
+    // .populate({ select: '_id,name', path: 'users', match: { tags } });
 
-    if (key && -1 < this.services.indexOf(key) && cache[key])
-      return cache[key].wordart;
-    else {
-      const json = {};
+    if (cachedWordArts.length) {
+      const { startedAt } =
+        find(cachedWordArts, {
+          _id: `${key}|${tags}`,
+        }) || {};
 
-      // metadata response
-      each(pick(cache, shuffle(this.services)), (value, key) => {
-        json[key] = {
-          hits: value.tweeters.map(tweeter => tweeter.key),
-          startedAt: value.startedAt,
-        };
-      });
+      if (startedAt) {
+        if (moment(startedAt).isBefore(moment().subtract(30, 'minutes')))
+          this.cache(key, tags);
 
-      return json;
+        return JSON.parse(
+          (
+            await this.cachedWordArtsTable.findOne(
+              { _id: `${key}|${tags}` },
+              { stringifiedJSON: 1 },
+            )
+          ).stringifiedJSON,
+        );
+      } else {
+        const json = {};
+
+        // metadata response
+        for (const { _id, startedAt, tweeters } of shuffle(cachedWordArts))
+          json[_id.split('|')[0]] = {
+            hits: tweeters,
+            startedAt,
+          };
+
+        return json;
+      }
+    } else {
+      await this.cache(key, tags);
+      return await this.wordart(key, tags);
     }
   }
 
   // populate wordart in cache
-  // @Cron('0 */15 * * * *')
   private async cache(key: string = '', tags: string = '') {
     if (!key)
       for await (const service of this.services) // loop
         await this.cache(service, tags || 'malayalam');
 
     if (-1 < this.services.indexOf(key)) {
-      const data = {
+      const $set = {
         startedAt: moment().toISOString(),
         tweeters: [],
-        wordart: {},
       };
 
       // iterate max 24 times (6 hours) or at-least 10 tweeters
-      for (let i = 0; data.tweeters.length < 10 && i < 24; i++) {
-        data.startedAt = moment(data.startedAt)
+      for (let i = 0; $set.tweeters.length < 10 && i < 24; i++) {
+        $set.startedAt = moment($set.startedAt)
           .subtract((i + 1) * 15, 'minutes')
           .toISOString();
 
@@ -79,21 +102,20 @@ export class WordartService {
         const users = await this.usersTable.find(
           {
             tags: { $in: tags.split('|') },
-            tweetedAt: { $gte: data.startedAt },
+            tweetedAt: { $gte: $set.startedAt },
           },
           { name: 1, [prop]: 1 },
           { limit: 90, sort: { tweetedAt: 'desc' } },
         );
-
         for (const user of users)
-          if (!find(data.tweeters, { key: user.name }) && 0 < (user[prop] || 0))
-            data.tweeters.push({
+          if (!find($set.tweeters, { key: user.name }) && 0 < (user[prop] || 0))
+            $set.tweeters.push({
               key: user.name,
               value: Math.ceil(user[prop]),
             });
       }
 
-      if (data.tweeters.length) {
+      if ($set.tweeters.length) {
         let content;
 
         try {
@@ -106,8 +128,8 @@ export class WordartService {
                     // randomizing images
                     image: this.urls[this.index++ % this.urls.length],
                     // words in csv format
-                    words: data.tweeters
-                      .map(item => `${item.key};${item.value}`)
+                    words: $set.tweeters
+                      .map(i => `${i.key};${i.value}`)
                       .join('\n'),
                   },
                 },
@@ -115,7 +137,7 @@ export class WordartService {
             )
           ).content.toString();
         } catch (e) {
-          this.logger.error(e, e.message, `WordartService/${key}`);
+          this.logger.error(e, e.message, `WordartService/${key}/${tags}`);
         }
 
         if (content) {
@@ -124,32 +146,32 @@ export class WordartService {
 
             this.logger.log(
               pick(json, ['statusCode', 'statusText']),
-              `WordartService/${key}`,
+              `WordartService/${key}/${tags}`,
             );
 
-            if (json.statusCode === 200) {
-              data.wordart = json.response;
-
-              // custom caching
-              this.cacheManager.set(
-                `wordart|${tags}`,
+            if (json.statusCode === 200)
+              await this.cachedWordArtsTable.updateOne(
+                { _id: `${key}|${tags}` },
                 {
-                  ...((await this.cacheManager.get(`wordart|${tags}`)) || {}),
-                  [key]: data,
+                  $set: {
+                    ...$set,
+                    stringifiedJSON: JSON.stringify(json.response),
+                    tweeters: $set.tweeters.map(i => i.key),
+                  },
                 },
-                { ttl: 900 }, // 15 minutes
+                { upsert: true },
               );
-            } else await this.cache(key);
+            else await this.cache(key, tags);
           } else
             this.logger.error(
               content,
               'invalid JSON response.content',
-              `WordartService/${key}`,
+              `WordartService/${key}/${tags}`,
             );
         }
       }
     }
 
-    return (await this.cacheManager.get(`wordart|${tags}`)) || {};
+    return true;
   }
 }

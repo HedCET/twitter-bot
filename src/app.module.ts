@@ -8,6 +8,10 @@ import { amqpProviders } from './amqp.providers';
 import { AmqpService } from './amqp.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import {
+  name as cachedWordArtsTableName,
+  schema as cachedWordArtsTableSchema,
+} from './cachedWordArts.table';
 import { env } from './env.validations';
 import { JwtStrategy } from './jwt.strategy';
 import {
@@ -37,13 +41,14 @@ import { WordartService } from './wordart.service';
       useUnifiedTopology: true,
     }),
     MongooseModule.forFeature([
+      { name: cachedWordArtsTableName, schema: cachedWordArtsTableSchema },
       { name: tweetsTableName, schema: tweetsTableSchema },
       { name: twitterAppsTableName, schema: twitterAppsTableSchema },
       { name: usersTableName, schema: usersTableSchema },
     ]),
     JwtModule.register({ secret: env.SECRET }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    CacheModule.register({ max: 1000 * 60, ttl: 900 }),
+    CacheModule.register({ max: 1000 * 60, ttl: 300 }),
     ScheduleModule.forRoot(),
   ],
   providers: [
