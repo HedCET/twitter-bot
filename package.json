@@ -14,7 +14,7 @@
     "axios": "^0.19.2",
     "big-integer": "^1.6.48",
     "cache-manager": "^2.11.1",
-    "class-transformer": "^0.2.3",
+    "class-transformer": "^0.3.1",
     "class-validator": "^0.9.1",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.5",

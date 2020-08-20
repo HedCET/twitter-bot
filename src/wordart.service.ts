@@ -137,7 +137,7 @@ export class WordartService {
                   ...((await this.cacheManager.get(`wordart|${tags}`)) || {}),
                   [key]: data,
                 },
-                { ttl: 3600 }, // 1 hour
+                { ttl: 900 }, // 15 minutes
               );
             } else await this.cache(key);
           } else
