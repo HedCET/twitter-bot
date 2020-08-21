@@ -82,4 +82,25 @@ export const scripts = {
       tweet_mode: 'extended',
     },
   },
+
+  // https://twitter.com/tekkiamma
+  tekkiamma: {
+    async execute({ client, executor, tweeter, status }) {
+      if (
+        executor._id !== tweeter._id &&
+        (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
+      ) {
+        await client.post('statuses/retweet', { id: status.id_str });
+        await new Promise(r => setTimeout(r, 1000 * 10));
+      }
+    },
+
+    searchQuery: {
+      count: 100,
+      lang: 'kn',
+      q: '%2A',
+      result_type: 'recent',
+      tweet_mode: 'extended',
+    },
+  },
 };
