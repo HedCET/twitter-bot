@@ -299,7 +299,7 @@ export class TwitterService {
           const thresholdTweet = await this.tweetsTable.findOne(
             { _id: new RegExp(`\\|${_id}$`) },
             null,
-            { skip: 3000, sort: { _id: 'desc' } },
+            { skip: 60000, sort: { _id: 'desc' } },
           );
 
           if (thresholdTweet)
