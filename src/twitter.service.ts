@@ -294,16 +294,23 @@ export class TwitterService {
 
           // no newTweets break
           if (!newTweets) break;
+
+          // clear old tweets
+          const thresholdTweet = await this.tweetsTable.findOne(
+            { _id: new RegExp(`\\|${_id}$`) },
+            null,
+            { skip: 3000, sort: { _id: 'desc' } },
+          );
+
+          if (thresholdTweet)
+            await this.tweetsTable.deleteMany({
+              $and: [
+                { _id: new RegExp(`\\|${_id}$`) },
+                { _id: { $lte: thresholdTweet._id } },
+              ],
+            });
         }
       });
-
-    const thresholdTweet = await this.tweetsTable.findOne({}, null, {
-      skip: 300000,
-      sort: { _id: 'desc' },
-    });
-
-    if (thresholdTweet)
-      await this.tweetsTable.deleteMany({ _id: { $lte: thresholdTweet._id } });
 
     // clear inactive users
     if (
