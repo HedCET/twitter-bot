@@ -111,13 +111,13 @@ export class TwitterService {
               'x-rate-limit-remaining',
             )}/${response._headers.get(
               'x-rate-limit-limit',
-            )} requests, ${moment
+            )} requests, +${moment
               .duration(
                 moment(response._headers.get('x-rate-limit-reset'), ['X']).diff(
                   moment(),
                 ),
               )
-              .asMilliseconds()} milliSeconds to reset`,
+              .asMilliseconds()}ms to reset`,
             `TwitterService/search/${name}`,
           );
 
@@ -252,9 +252,9 @@ export class TwitterService {
                 moment(ns.reset).isAfter(moment())
               )
                 this.logger.error(
-                  `skipping, ${moment
+                  `skipping, +${moment
                     .duration(ns.reset.diff(moment()))
-                    .asMilliseconds()} milliSeconds to reset`,
+                    .asMilliseconds()}ms to reset`,
                   `${status.user.screen_name}/${status.id_str}`,
                   `TwitterService/search/${name}`,
                 );
@@ -286,7 +286,7 @@ export class TwitterService {
 
                   // skipping logic
                   if (has(e, 'errors') && -1 < [185].indexOf(e.errors[0].code))
-                    ns.reset = moment().add(3, 'minutes'); // 3 minutes
+                    ns.reset = moment().add(1, 'minute'); // 1 minute
                 }
               }
             }
