@@ -24,7 +24,7 @@ export const scripts = {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
+        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
       ) {
         await client.post('statuses/retweet', { id: status.id_str });
         await new Promise(r => setTimeout(r, 1000 * 10)); // delay 10 seconds
@@ -67,7 +67,7 @@ export const scripts = {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
+        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
       ) {
         await client.post('statuses/retweet', { id: status.id_str });
         await new Promise(r => setTimeout(r, 1000 * 10));
@@ -88,7 +88,7 @@ export const scripts = {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
+        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
       ) {
         await client.post('statuses/retweet', { id: status.id_str });
         await new Promise(r => setTimeout(r, 1000 * 10));
@@ -109,7 +109,7 @@ export const scripts = {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 30 < (tweeter.tweetFrequency || 0))
+        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
       ) {
         await client.post('statuses/retweet', { id: status.id_str });
         await new Promise(r => setTimeout(r, 1000 * 10));
