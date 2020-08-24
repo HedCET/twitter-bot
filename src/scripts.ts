@@ -25,10 +25,8 @@ export const scripts = {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
-      ) {
+      )
         await client.post('statuses/retweet', { id: status.id_str });
-        await new Promise(r => setTimeout(r, 1000 * 10)); // delay 10 seconds
-      }
     },
 
     // search/tweets => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/search/api-reference/get-search-tweets
@@ -44,22 +42,11 @@ export const scripts = {
   // https://twitter.com/kulukulu0033
   // kulukulu0033: {
   //   async execute({ client, executor, tweeter, status }) {
-  //     if (
-  //       executor._id !== tweeter._id &&
-  //       status.full_text.match(/സ്വാമിന.*/g)
-  //     ) {
+  //     if (executor._id !== tweeter._id && status.full_text.match(/സ്വാമിന.*/g))
   //       await client.post('statuses/retweet', { id: status.id_str });
-  //       await new Promise(r => setTimeout(r, 1000 * 10));
-  //     }
   //   },
 
-  //   searchQuery: {
-  //     count: 100,
-  //     lang: 'ml',
-  //     q: '%2A',
-  //     result_type: 'recent',
-  //     tweet_mode: 'extended',
-  //   },
+  //   searchQuery: 'crawlamma.searchQuery', // shared searchQuery
   // },
 
   // https://twitter.com/kuklamma
@@ -68,10 +55,8 @@ export const scripts = {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
-      ) {
+      )
         await client.post('statuses/retweet', { id: status.id_str });
-        await new Promise(r => setTimeout(r, 1000 * 10));
-      }
     },
 
     searchQuery: {
@@ -89,10 +74,8 @@ export const scripts = {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
-      ) {
+      )
         await client.post('statuses/retweet', { id: status.id_str });
-        await new Promise(r => setTimeout(r, 1000 * 10));
-      }
     },
 
     searchQuery: {
@@ -110,10 +93,8 @@ export const scripts = {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
-      ) {
+      )
         await client.post('statuses/retweet', { id: status.id_str });
-        await new Promise(r => setTimeout(r, 1000 * 10));
-      }
     },
 
     searchQuery: {

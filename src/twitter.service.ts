@@ -46,7 +46,6 @@ export class TwitterService {
     )
       .filter(executor => executor.twitterApp && scripts[executor.name])
       .forEach(async executor => {
-        // destructuring
         const {
           _id,
           accessTokenKey: access_token_key,
@@ -60,8 +59,11 @@ export class TwitterService {
           name,
         } = executor;
 
-        // twitter-lite instance
-        const client = new Twitter({
+        // executor namespace
+        const ns = scripts[name]; // as ref
+
+        ns.executor = executor;
+        ns.client = new Twitter({
           access_token_key,
           access_token_secret,
           consumer_key,
@@ -70,7 +72,7 @@ export class TwitterService {
 
         // verify credentials
         try {
-          await client.get('account/verify_credentials');
+          await ns.client.get('account/verify_credentials');
         } catch (e) {
           this.logger.error(
             e,
@@ -84,28 +86,35 @@ export class TwitterService {
             { $set: { accessRevoked: true } },
           );
 
-          // continue
           return;
         }
 
-        // executor namespace
-        const ns = scripts[name];
+        // attach to parent
+        if (typeof ns.searchQuery === 'string') {
+          const parent = scripts[ns.searchQuery.split('.')[0]];
 
-        // maximum 10 times
-        for (let i = 0, maxId; i < 10; i++) {
-          const requestQuery: searchQuery = {
-            ...(query || ns.searchQuery),
-          };
+          if (parent) {
+            if (parent.children) parent.children.push(ns);
+            else parent.children = [ns];
+          }
 
-          // limit 100 & skip till maxId
-          if (maxId) requestQuery.max_id = maxId;
+          return;
+        }
 
+        // wait +30s for children
+        await new Promise(r => setTimeout(r, 1000 * 30));
+
+        const requestQuery: searchQuery = {
+          ...ns.searchQuery,
+          ...(query || {}),
+        };
+
+        for (let i = 0; i < 60; i++) {
           const response: {
             _headers: { [key: string]: any };
             statuses: tweetInterface[];
-          } = await client.get('search/tweets', requestQuery);
+          } = await ns.client.get('search/tweets', requestQuery);
 
-          // statistics
           this.logger.log(
             `remaining ${response._headers.get(
               'x-rate-limit-remaining',
@@ -121,7 +130,6 @@ export class TwitterService {
             `TwitterService/search/${name}`,
           );
 
-          // break if empty array
           if (!response.statuses.length) break;
 
           // ascending sort
@@ -132,8 +140,8 @@ export class TwitterService {
               ]).toISOString()}|${status.id_str}`,
           ]);
 
-          // set maxId for next iteration
-          maxId = BigInt(statuses[0].id_str)
+          // set max_id for next iteration
+          requestQuery.max_id = BigInt(statuses[0].id_str)
             .subtract(1)
             .toString();
 
@@ -157,31 +165,25 @@ export class TwitterService {
             };
             const $unset: { [key: string]: any } = {};
 
-            // followers
             if (status.user.followers_count)
               $set.followers = status.user.followers_count;
             else $unset.followers = true;
 
-            // friends
             if (status.user.friends_count)
               $set.friends = status.user.friends_count;
             else $unset.friends = true;
 
-            // likes
             if (status.user.favourites_count)
               $set.likes = status.user.favourites_count;
             else $unset.likes = true;
 
-            // lists
             if (status.user.listed_count) $set.lists = status.user.listed_count;
             else $unset.lists = true;
 
-            // tweets
             if (status.user.statuses_count)
               $set.tweets = status.user.statuses_count;
             else $unset.tweets = true;
 
-            // existing tweeter
             const tweeter = await this.usersTable.findOne(
               { _id: status.user.id_str },
               fromPairs(this.appProps.map(i => [i, 0])),
@@ -193,7 +195,6 @@ export class TwitterService {
                 .duration(tweetedAt.diff(tweeter.tweetedAt))
                 .asDays();
 
-              // average followers per day
               if (
                 tweeter.followers &&
                 status.user.followers_count !== tweeter.followers
@@ -202,7 +203,6 @@ export class TwitterService {
                   (status.user.followers_count - tweeter.followers) /
                   $set.tweetFrequency;
 
-              // average friends per day
               if (
                 tweeter.friends &&
                 status.user.friends_count !== tweeter.friends
@@ -211,7 +211,6 @@ export class TwitterService {
                   (status.user.friends_count - tweeter.friends) /
                   $set.tweetFrequency;
 
-              // average likes per day
               if (
                 tweeter.likes &&
                 status.user.favourites_count !== tweeter.likes
@@ -220,21 +219,18 @@ export class TwitterService {
                   (status.user.favourites_count - tweeter.likes) /
                   $set.tweetFrequency;
 
-              // average lists per day
               if (tweeter.lists && status.user.listed_count !== tweeter.lists)
                 $set.averageLists =
                   (status.user.listed_count - tweeter.lists) /
                   $set.tweetFrequency;
             }
 
-            // upsert
             await this.usersTable.updateOne(
               { _id: status.user.id_str },
               { $addToSet, $set, $unset },
               { upsert: true },
             );
 
-            // new tweet identification logic
             const tweet = await this.tweetsTable.findOne({
               _id: `${status.id_str}|${_id}`,
             });
@@ -242,60 +238,68 @@ export class TwitterService {
             if (!tweet) {
               newTweets++;
 
-              // persistent store
               await new this.tweetsTable({
                 _id: `${status.id_str}|${_id}`,
               }).save();
 
-              if (
-                moment.isMoment(ns.reset) &&
-                moment(ns.reset).isAfter(moment())
-              )
-                this.logger.error(
-                  `skipping, +${moment
-                    .duration(ns.reset.diff(moment()))
-                    .asMilliseconds()}ms to reset`,
-                  `${status.user.screen_name}/${status.id_str}`,
-                  `TwitterService/search/${name}`,
-                );
-              else {
-                this.logger.log(
-                  `${status.user.screen_name}/${status.id_str}`,
-                  `TwitterService/search/${name}`,
-                );
+              // delay required for rate limiting
+              let delayRequired: boolean;
 
-                try {
-                  // execute script
-                  const res = await ns.execute({
-                    client,
-                    executor: omit(executor, this.appProps),
-                    tweeter:
-                      tweeter ||
-                      (await this.usersTable.findOne(
-                        { _id: status.user.id_str },
-                        fromPairs(this.appProps.map(i => [i, 0])),
-                      )),
-                    status,
-                  });
-                } catch (e) {
+              [ns].concat(ns.children || []).forEach(async ns => {
+                if (
+                  moment.isMoment(ns.reset) &&
+                  moment(ns.reset).isAfter(moment())
+                )
                   this.logger.error(
-                    e,
+                    `skipping, +${moment
+                      .duration(ns.reset.diff(moment()))
+                      .asMilliseconds()}ms to reset`,
                     `${status.user.screen_name}/${status.id_str}`,
-                    `TwitterService/search/${name}`,
+                    `TwitterService/search/${ns.executor.name}`,
+                  );
+                else {
+                  this.logger.log(
+                    `${status.user.screen_name}/${status.id_str}`,
+                    `TwitterService/search/${ns.executor.name}`,
                   );
 
-                  // skipping logic
-                  if (has(e, 'errors') && -1 < [185].indexOf(e.errors[0].code))
-                    ns.reset = moment().add(1, 'minute'); // 1 minute
+                  try {
+                    await ns.execute({
+                      client: ns.client,
+                      executor: omit(ns.executor, this.appProps),
+                      tweeter:
+                        tweeter ||
+                        (await this.usersTable.findOne(
+                          { _id: status.user.id_str },
+                          fromPairs(this.appProps.map(i => [i, 0])),
+                        )),
+                      status,
+                    });
+
+                    if (!delayRequired) delayRequired = true;
+                  } catch (e) {
+                    this.logger.error(
+                      e,
+                      `${status.user.screen_name}/${status.id_str}`,
+                      `TwitterService/search/${name}`,
+                    );
+
+                    if (
+                      has(e, 'errors') &&
+                      -1 < [185].indexOf(e.errors[0].code)
+                    )
+                      ns.reset = moment().add(1, 'minute');
+                  }
                 }
-              }
+              });
+
+              if (delayRequired)
+                await new Promise(r => setTimeout(r, 1000 * 10));
             }
           }
 
-          // no newTweets break
           if (!newTweets) break;
 
-          // clear old tweets
           const thresholdTweet = await this.tweetsTable.findOne(
             { _id: new RegExp(`\\|${_id}$`) },
             null,
@@ -312,7 +316,6 @@ export class TwitterService {
         }
       });
 
-    // clear inactive users
     if (
       16 * 1024 * 1024 * 1024 <
       (await this.usersTable.collection.stats()).storageSize

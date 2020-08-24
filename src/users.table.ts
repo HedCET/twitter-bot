@@ -45,7 +45,7 @@ export const schema = new Schema(
     friends: Number,
     likes: Number,
     lists: Number,
-    name: { index: true, required: true, type: String },
+    name: { index: true, required: true, unique: true, type: String },
     roles: [String],
     tags: [String],
     tweetedAt: Date,
