@@ -87,8 +87,8 @@ export const scripts = {
     },
   },
 
-  // https://twitter.com/naakuamma
-  naakuamma: {
+  // https://twitter.com/telugulamma
+  telugulamma: {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
