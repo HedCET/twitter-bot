@@ -46,7 +46,7 @@ export const scripts = {
   //       await client.post('statuses/retweet', { id: status.id_str });
   //   },
 
-  //   searchQuery: 'crawlamma.searchQuery', // shared searchQuery
+  //   searchQuery: 'crawlamma.searchQuery', // shared
   // },
 
   // https://twitter.com/kuklamma
@@ -87,8 +87,8 @@ export const scripts = {
     },
   },
 
-  // https://twitter.com/telugulamma
-  telugulamma: {
+  // https://twitter.com/overamma
+  overamma: {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&

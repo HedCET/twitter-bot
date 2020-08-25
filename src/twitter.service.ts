@@ -281,14 +281,14 @@ export class TwitterService {
                     this.logger.error(
                       e,
                       `${status.user.screen_name}/${status.id_str}`,
-                      `TwitterService/search/${name}`,
+                      `TwitterService/search/${ns.executor.name}`,
                     );
 
                     if (
                       has(e, 'errors') &&
                       -1 < [185].indexOf(e.errors[0].code)
                     )
-                      ns.reset = moment().add(1, 'minute');
+                      ns.reset = moment().add(1, 'minutes');
                   }
                 }
               });
