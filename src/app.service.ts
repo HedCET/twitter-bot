@@ -13,7 +13,7 @@ export class AppService {
     const name = new RegExp(query, 'i');
 
     const hits = await this.usersTable.find(
-      { name, tags: { $in: tags.split('|') } },
+      { name, ...(tags && { tags: { $in: tags.split('|') } }) },
       { name: 1 },
       { limit: 10, sort: { tweetedAt: 'desc' } },
     );

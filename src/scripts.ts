@@ -27,6 +27,7 @@ export const scripts = {
         (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
         !status.retweeted
       )
+        // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
         await client.post('statuses/retweet', { id: status.id_str });
     },
 
@@ -49,64 +50,4 @@ export const scripts = {
 
   //   searchQuery: 'crawlamma.searchQuery', // shared
   // },
-
-  // https://twitter.com/kuklamma
-  kuklamma: {
-    async execute({ client, executor, tweeter, status }) {
-      if (
-        executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
-        !status.retweeted
-      )
-        await client.post('statuses/retweet', { id: status.id_str });
-    },
-
-    searchQuery: {
-      count: 100,
-      lang: 'ta',
-      q: '%2A',
-      result_type: 'recent',
-      tweet_mode: 'extended',
-    },
-  },
-
-  // https://twitter.com/tekkiamma
-  tekkiamma: {
-    async execute({ client, executor, tweeter, status }) {
-      if (
-        executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
-        !status.retweeted
-      )
-        await client.post('statuses/retweet', { id: status.id_str });
-    },
-
-    searchQuery: {
-      count: 100,
-      lang: 'kn',
-      q: '%2A',
-      result_type: 'recent',
-      tweet_mode: 'extended',
-    },
-  },
-
-  // https://twitter.com/overamma
-  overamma: {
-    async execute({ client, executor, tweeter, status }) {
-      if (
-        executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
-        !status.retweeted
-      )
-        await client.post('statuses/retweet', { id: status.id_str });
-    },
-
-    searchQuery: {
-      count: 100,
-      lang: 'te',
-      q: '%2A',
-      result_type: 'recent',
-      tweet_mode: 'extended',
-    },
-  },
 };

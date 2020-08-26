@@ -42,15 +42,15 @@ export class WordartService {
     // .populate({ select: '_id,name', path: 'users', match: { tags } });
 
     if (cachedWordArts.length) {
-      const { startedAt } =
-        find(cachedWordArts, {
-          _id: `${key}|${tags}`,
-        }) || {};
+      cachedWordArts.forEach(async ({ _id, startedAt }) => {
+        // 30 minutes refresh
+        if (moment(startedAt).isBefore(moment().subtract(30, 'minutes'))) {
+          const [key, tags] = _id.split('|');
+          await this.cache(key, tags);
+        }
+      });
 
-      if (startedAt) {
-        if (moment(startedAt).isBefore(moment().subtract(30, 'minutes')))
-          this.cache(key, tags);
-
+      if (find(cachedWordArts, { _id: `${key}|${tags}` }))
         return JSON.parse(
           (
             await this.cachedWordArtsTable.findOne(
@@ -59,7 +59,7 @@ export class WordartService {
             )
           ).stringifiedJSON,
         );
-      } else {
+      else {
         const json = {};
 
         // metadata response
@@ -77,7 +77,7 @@ export class WordartService {
     }
   }
 
-  // populate wordart in cache
+  // populate wordart
   private async cache(key: string = '', tags: string = '') {
     if (!key)
       for await (const service of this.services) // loop
@@ -101,7 +101,7 @@ export class WordartService {
         // dynamic projection
         const users = await this.usersTable.find(
           {
-            tags: { $in: tags.split('|') },
+            ...(tags && { tags: { $in: tags.split('|') } }),
             tweetedAt: { $gte: $set.startedAt },
           },
           { name: 1, [prop]: 1 },
