@@ -43,7 +43,6 @@ export class WordartService {
 
     if (cachedWordArts.length) {
       cachedWordArts.forEach(async ({ _id, startedAt }) => {
-        // 30 minutes refresh
         if (moment(startedAt).isBefore(moment().subtract(30, 'minutes'))) {
           const [key, tags] = _id.split('|');
           await this.cache(key, tags);

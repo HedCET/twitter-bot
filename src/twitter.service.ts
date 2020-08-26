@@ -317,7 +317,7 @@ export class TwitterService {
       });
 
     if (
-      16 * 1024 * 1024 * 1024 <
+      384 * 1024 * 1024 <
       (await this.usersTable.collection.stats()).storageSize
     )
       await this.usersTable.deleteMany({
