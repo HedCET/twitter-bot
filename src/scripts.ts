@@ -24,7 +24,8 @@ export const scripts = {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
+        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
+        !status.retweeted
       )
         await client.post('statuses/retweet', { id: status.id_str });
     },
@@ -54,7 +55,8 @@ export const scripts = {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
+        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
+        !status.retweeted
       )
         await client.post('statuses/retweet', { id: status.id_str });
     },
@@ -73,7 +75,8 @@ export const scripts = {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
+        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
+        !status.retweeted
       )
         await client.post('statuses/retweet', { id: status.id_str });
     },
@@ -92,7 +95,8 @@ export const scripts = {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0))
+        (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
+        !status.retweeted
       )
         await client.post('statuses/retweet', { id: status.id_str });
     },
