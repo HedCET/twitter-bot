@@ -276,7 +276,7 @@ export class TwitterService {
                       status,
                     });
 
-                    if (!delayRequired) delayRequired = true;
+                    delayRequired = true;
                   } catch (e) {
                     this.logger.error(
                       e,
