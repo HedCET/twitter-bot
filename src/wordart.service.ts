@@ -80,7 +80,7 @@ export class WordartService {
   private async cache(key: string = '', tags: string = '') {
     if (!key)
       for await (const service of this.services) // loop
-        await this.cache(service, tags || 'malayalam');
+        await this.cache(service, tags);
 
     if (-1 < this.services.indexOf(key)) {
       const $set = {
