@@ -25,7 +25,7 @@ export class AppService {
           ? hits.length
           : await this.usersTable.countDocuments({
               name,
-              tags: { $in: tags.split('|') },
+              ...(tags && { tags: { $in: tags.split('|') } }),
             }),
     };
   }
