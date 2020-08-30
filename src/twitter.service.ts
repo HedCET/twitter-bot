@@ -113,7 +113,7 @@ export class TwitterService {
           ...(query || {}),
         };
 
-        for (let i = 0; i < 60; i++) {
+        for (let i = 0; i < 36; i++) {
           const response: {
             _headers: { [key: string]: any };
             statuses: tweetInterface[];
