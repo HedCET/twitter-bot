@@ -230,18 +230,19 @@ export class TwitterService {
               { upsert: true },
             );
 
-            const tweet = await this.settingsTable.findOne({
+            const setting = await this.settingsTable.findOne({
               _id: `${_id}|lastTweetId`,
               value: { $gte: status.id_str },
             });
 
-            if (!tweet) {
+            if (!setting) {
               newTweets++;
 
-              await this.settingsTable.updateOne({
-                _id: `${_id}|lastTweetId`,
-                value: status.id_str,
-              });
+              await this.settingsTable.updateOne(
+                { _id: `${_id}|lastTweetId` },
+                { $set: { value: status.id_str } },
+                { upsert: true },
+              );
 
               // delay required for rate limiting
               let delayRequired: boolean;
