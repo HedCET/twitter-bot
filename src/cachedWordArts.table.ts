@@ -16,7 +16,7 @@ export const name = 'cachedWordArts';
 // table schema
 export const schema = new Schema(
   {
-    _id: { required: true, type: String },
+    _id: String,
     startedAt: { required: true, type: Date },
     stringifiedJSON: { required: true, type: String },
     tweeters: [{ required: true, type: String }],

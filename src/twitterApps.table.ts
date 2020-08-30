@@ -15,7 +15,7 @@ export const name = 'twitterApps';
 // table schema
 export const schema = new Schema(
   {
-    _id: { required: true, type: String },
+    _id: String,
     consumerKey: { required: true, type: String },
     consumerSecret: { required: true, type: String },
     deleted: Boolean,

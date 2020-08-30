@@ -25,7 +25,7 @@ export const scripts = {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
-        !status.retweeted
+        !status.retweeted // with searchQuery
       )
         // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
         await client.post('statuses/retweet', { id: status.id_str });
@@ -48,6 +48,6 @@ export const scripts = {
   //       await client.post('statuses/retweet', { id: status.id_str });
   //   },
 
-  //   searchQuery: 'crawlamma.searchQuery', // shared
+  //   searchQuery: 'crawlamma.searchQuery', // shared children
   // },
 };

@@ -32,7 +32,7 @@ export const name = 'users';
 // table schema
 export const schema = new Schema(
   {
-    _id: { required: true, type: String },
+    _id: String,
     accessRevoked: Boolean,
     accessTokenKey: String,
     accessTokenSecret: String,
@@ -48,7 +48,7 @@ export const schema = new Schema(
     name: { index: true, required: true, type: String },
     roles: [String],
     tags: [String],
-    tweetedAt: Date,
+    tweetedAt: { index: true, type: Date },
     tweetFrequency: Number,
     tweets: Number,
     twitterApp: { ref: twitterAppsRef, type: String },

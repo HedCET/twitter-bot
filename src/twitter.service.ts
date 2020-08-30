@@ -8,7 +8,10 @@ import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
 
 import { scripts } from './scripts';
-import { model as tweetsModel, name as tweetsToken } from './tweets.table';
+import {
+  model as settingsModel,
+  name as settingsToken,
+} from './settings.table';
 import { searchQuery, tweetInterface } from './twitter.interface';
 import { model as usersModel, name as usersToken } from './users.table';
 
@@ -26,12 +29,13 @@ export class TwitterService {
 
   constructor(
     private readonly logger: Logger,
-    @InjectModel(tweetsToken) private readonly tweetsTable: Model<tweetsModel>,
+    @InjectModel(settingsToken)
+    private readonly settingsTable: Model<settingsModel>,
     @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
   ) {}
 
   // scheduled search
-  @Cron('0 */5 * * * *')
+  @Cron('0 */3 * * * *')
   private async search(query?: searchQuery) {
     // get executors
     (
@@ -133,12 +137,7 @@ export class TwitterService {
           if (!response.statuses.length) break;
 
           // ascending sort
-          const statuses = sortBy(response.statuses, [
-            status =>
-              `${moment(status.created_at, [
-                'ddd MMM D HH:mm:ss ZZ YYYY',
-              ]).toISOString()}|${status.id_str}`,
-          ]);
+          const statuses = sortBy(response.statuses, ['id_str']);
 
           // set max_id for next iteration
           requestQuery.max_id = BigInt(statuses[0].id_str)
@@ -231,16 +230,18 @@ export class TwitterService {
               { upsert: true },
             );
 
-            const tweet = await this.tweetsTable.findOne({
-              _id: `${status.id_str}|${_id}`,
+            const tweet = await this.settingsTable.findOne({
+              _id: `${_id}|lastTweetId`,
+              value: { $gte: status.id_str },
             });
 
             if (!tweet) {
               newTweets++;
 
-              await new this.tweetsTable({
-                _id: `${status.id_str}|${_id}`,
-              }).save();
+              await this.settingsTable.updateOne({
+                _id: `${_id}|lastTweetId`,
+                value: status.id_str,
+              });
 
               // delay required for rate limiting
               let delayRequired: boolean;
@@ -299,20 +300,6 @@ export class TwitterService {
           }
 
           if (!newTweets) break;
-
-          const thresholdTweet = await this.tweetsTable.findOne(
-            { _id: new RegExp(`\\|${_id}$`) },
-            null,
-            { skip: 60000, sort: { _id: 'desc' } },
-          );
-
-          if (thresholdTweet)
-            await this.tweetsTable.deleteMany({
-              $and: [
-                { _id: new RegExp(`\\|${_id}$`) },
-                { _id: { $lte: thresholdTweet._id } },
-              ],
-            });
         }
       });
 

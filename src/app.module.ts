@@ -15,9 +15,9 @@ import {
 import { env } from './env.validations';
 import { JwtStrategy } from './jwt.strategy';
 import {
-  name as tweetsTableName,
-  schema as tweetsTableSchema,
-} from './tweets.table';
+  name as settingsTableName,
+  schema as settingsTableSchema,
+} from './settings.table';
 import { TwitterAuthController } from './twitter.auth.controller';
 import { TwitterAuthService } from './twitter.auth.service';
 import { TwitterService } from './twitter.service';
@@ -42,7 +42,7 @@ import { WordartService } from './wordart.service';
     }),
     MongooseModule.forFeature([
       { name: cachedWordArtsTableName, schema: cachedWordArtsTableSchema },
-      { name: tweetsTableName, schema: tweetsTableSchema },
+      { name: settingsTableName, schema: settingsTableSchema },
       { name: twitterAppsTableName, schema: twitterAppsTableSchema },
       { name: usersTableName, schema: usersTableSchema },
     ]),
