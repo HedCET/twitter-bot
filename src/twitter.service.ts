@@ -227,16 +227,11 @@ export class TwitterService {
               { upsert: true },
             );
 
-            const setting = await this.settingsTable.findOne({
-              _id: `${_id}|since_id`,
-              value: { $gte: status.id_str },
-            });
-
-            if (!setting) {
+            if (requestQuery.since_id < status.id_str) {
               newTweets++;
 
               await this.settingsTable.updateOne(
-                { _id: `${_id}|since_id` },
+                { _id: `${_id}|since_id`, value: { $lt: status.id_str } },
                 { $set: { value: status.id_str } },
                 { upsert: true },
               );
