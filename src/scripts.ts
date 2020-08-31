@@ -25,7 +25,7 @@ export const scripts = {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
-        status.full_text.startsWith(
+        !status.full_text.startsWith(
           `RT @${status.retweeted_status?.user?.screen_name}: ${(
             status.retweeted_status?.full_text || ''
           ).substr(0, 110)}`,
@@ -51,7 +51,7 @@ export const scripts = {
   //     if (
   //       executor._id !== tweeter._id &&
   //       status.full_text.match(/സ്വാമിന.*/g) &&
-  //       status.full_text.startsWith(
+  //       !status.full_text.startsWith(
   //         `RT @${status.retweeted_status?.user?.screen_name}: ${(
   //           status.retweeted_status?.full_text || ''
   //         ).substr(0, 110)}`,

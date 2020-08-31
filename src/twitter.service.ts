@@ -110,9 +110,14 @@ export class TwitterService {
         const requestQuery: searchQuery = {
           ...ns.searchQuery,
           ...(query || {}),
-          since_id: await this.settingsTable.findOne({
-            _id: `${_id}|since_id`,
-          }),
+          since_id: (
+            (await this.settingsTable.findOne({ _id: `${_id}|since_id` })) ||
+            (await this.settingsTable.findOneAndUpdate(
+              { _id: `${_id}|since_id` },
+              { $set: { value: '0' } },
+              { returnOriginal: false, upsert: true },
+            ))
+          ).value,
         };
 
         for (let i = 0; i < 60; i++) {
@@ -233,7 +238,6 @@ export class TwitterService {
               await this.settingsTable.updateOne(
                 { _id: `${_id}|since_id`, value: { $lt: status.id_str } },
                 { $set: { value: status.id_str } },
-                { upsert: true },
               );
 
               // delay required for rate limiting
