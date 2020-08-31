@@ -60,6 +60,6 @@ export const scripts = {
   //       await client.post('statuses/retweet', { id: status.id_str });
   //   },
 
-  //   searchQuery: 'crawlamma.searchQuery', // register as children
+  //   searchQuery: 'crawlamma.searchQuery', // attach to crawlamma
   // },
 };
