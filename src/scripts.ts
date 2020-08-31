@@ -25,7 +25,11 @@ export const scripts = {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
-        !status.retweeted // with searchQuery
+        status.full_text.indexOf(
+          `RT @${status.retweeted_status?.user?.screen_name}: ${(
+            status.retweeted_status?.full_text || ''
+          ).substr(0, 110)}`,
+        ) === -1
       )
         // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
         await client.post('statuses/retweet', { id: status.id_str });
@@ -44,10 +48,18 @@ export const scripts = {
   // https://twitter.com/kulukulu0033
   // kulukulu0033: {
   //   async execute({ client, executor, tweeter, status }) {
-  //     if (executor._id !== tweeter._id && status.full_text.match(/സ്വാമിന.*/g))
+  //     if (
+  //       executor._id !== tweeter._id &&
+  //       status.full_text.match(/സ്വാമിന.*/g) &&
+  //       status.full_text.indexOf(
+  //         `RT @${status.retweeted_status?.user?.screen_name}: ${(
+  //           status.retweeted_status?.full_text || ''
+  //         ).substr(0, 110)}`,
+  //       ) === -1
+  //     )
   //       await client.post('statuses/retweet', { id: status.id_str });
   //   },
 
-  //   searchQuery: 'crawlamma.searchQuery', // shared children
+  //   searchQuery: 'crawlamma.searchQuery', // register as children
   // },
 };
