@@ -25,11 +25,11 @@ export const scripts = {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
-        status.full_text.indexOf(
+        status.full_text.startsWith(
           `RT @${status.retweeted_status?.user?.screen_name}: ${(
             status.retweeted_status?.full_text || ''
           ).substr(0, 110)}`,
-        ) === -1
+        )
       )
         // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
         await client.post('statuses/retweet', { id: status.id_str });
@@ -51,15 +51,15 @@ export const scripts = {
   //     if (
   //       executor._id !== tweeter._id &&
   //       status.full_text.match(/സ്വാമിന.*/g) &&
-  //       status.full_text.indexOf(
+  //       status.full_text.startsWith(
   //         `RT @${status.retweeted_status?.user?.screen_name}: ${(
   //           status.retweeted_status?.full_text || ''
   //         ).substr(0, 110)}`,
-  //       ) === -1
+  //       )
   //     )
   //       await client.post('statuses/retweet', { id: status.id_str });
   //   },
 
-  //   searchQuery: 'crawlamma.searchQuery', // attach to crawlamma
+  //   searchQuery: 'crawlamma.searchQuery', // attach to crawlamma as children
   // },
 };
