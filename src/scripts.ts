@@ -25,6 +25,7 @@ export const scripts = {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 90 < (tweeter.tweetFrequency || 0)) &&
+        !status.retweeted && // with searchQuery
         !status.full_text.startsWith(
           `RT @${status.retweeted_status?.user?.screen_name}: ${(
             status.retweeted_status?.full_text || ''

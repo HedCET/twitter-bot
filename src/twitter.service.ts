@@ -232,16 +232,15 @@ export class TwitterService {
               { upsert: true },
             );
 
-            if (requestQuery.since_id < status.id_str) {
+            if (
+              (
+                await this.settingsTable.updateOne(
+                  { _id: `${_id}|since_id`, value: { $lt: status.id_str } },
+                  { $set: { value: status.id_str } },
+                )
+              ).n
+            ) {
               newTweets++;
-
-              await this.settingsTable.updateOne(
-                { _id: `${_id}|since_id`, value: { $lt: status.id_str } },
-                { $set: { value: status.id_str } },
-              );
-
-              // delay required for rate limiting
-              let delayRequired: boolean;
 
               [ns].concat(ns.children || []).forEach(async ns => {
                 if (
@@ -273,8 +272,6 @@ export class TwitterService {
                         )),
                       status,
                     });
-
-                    delayRequired = true;
                   } catch (e) {
                     this.logger.error(
                       e,
@@ -290,9 +287,6 @@ export class TwitterService {
                   }
                 }
               });
-
-              if (delayRequired)
-                await new Promise(r => setTimeout(r, 1000 * 10));
             }
           }
 
