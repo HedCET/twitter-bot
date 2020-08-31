@@ -110,10 +110,9 @@ export class TwitterService {
         const requestQuery: searchQuery = {
           ...ns.searchQuery,
           ...(query || {}),
-          since_id: (
-            (await this.settingsTable.findOne({ _id: `${_id}|since_id` })) ||
-            '|0'
-          ).split('|')[1],
+          since_id: await this.settingsTable.findOne({
+            _id: `${_id}|since_id`,
+          }),
         };
 
         for (let i = 0; i < 36; i++) {
