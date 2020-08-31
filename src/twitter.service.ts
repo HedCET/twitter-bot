@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
-import * as BigInt from 'big-integer';
 import { fromPairs, has, omit, sortBy } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
@@ -111,6 +110,10 @@ export class TwitterService {
         const requestQuery: searchQuery = {
           ...ns.searchQuery,
           ...(query || {}),
+          since_id: (
+            (await this.settingsTable.findOne({ _id: `${_id}|since_id` })) ||
+            '|0'
+          ).split('|')[1],
         };
 
         for (let i = 0; i < 36; i++) {
@@ -138,11 +141,6 @@ export class TwitterService {
 
           // ascending sort
           const statuses = sortBy(response.statuses, ['id_str']);
-
-          // set max_id for next iteration
-          requestQuery.max_id = BigInt(statuses[0].id_str)
-            .subtract(1)
-            .toString();
 
           // new tweets counter
           let newTweets = 0;
@@ -231,7 +229,7 @@ export class TwitterService {
             );
 
             const setting = await this.settingsTable.findOne({
-              _id: `${_id}|lastTweetId`,
+              _id: `${_id}|since_id`,
               value: { $gte: status.id_str },
             });
 
@@ -239,7 +237,7 @@ export class TwitterService {
               newTweets++;
 
               await this.settingsTable.updateOne(
-                { _id: `${_id}|lastTweetId` },
+                { _id: `${_id}|since_id` },
                 { $set: { value: status.id_str } },
                 { upsert: true },
               );
