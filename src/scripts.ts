@@ -35,9 +35,26 @@ export const scripts = {
             status.retweeted_status?.full_text || ''
           ).substr(0, 110)}`,
         )
-      )
+      ) {
         // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
         await client.post('statuses/retweet', { id: status.id_str });
+
+        console.log(
+          'crawlamma',
+          executor._id !== tweeter._id,
+          1024 < (tweeter.averageFollowers || 0),
+          256 < (tweeter.averageFriends || 0),
+          8192 < (tweeter.averageLikes || 0),
+          !tweeter.tweetFrequency,
+          90 < (tweeter.tweetFrequency || 0),
+          !status.retweeted,
+          !status.full_text.startsWith(
+            `RT @${status.retweeted_status?.user?.screen_name}: ${(
+              status.retweeted_status?.full_text || ''
+            ).substr(0, 110)}`,
+          ),
+        );
+      }
     },
 
     // search/tweets => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/search/api-reference/get-search-tweets
