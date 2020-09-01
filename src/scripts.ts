@@ -25,7 +25,7 @@ export const scripts = {
       if (
         executor._id !== tweeter._id &&
         (1024 < (tweeter.averageFollowers || 0) ||
-          256 < (tweeter.averageFriends || 0) ||
+          1024 < (tweeter.averageFriends || 0) ||
           8192 < (tweeter.averageLikes || 0) ||
           !tweeter.tweetFrequency ||
           90 < (tweeter.tweetFrequency || 0)) &&
@@ -43,7 +43,7 @@ export const scripts = {
           'crawlamma',
           executor._id !== tweeter._id,
           1024 < (tweeter.averageFollowers || 0),
-          256 < (tweeter.averageFriends || 0),
+          1024 < (tweeter.averageFriends || 0),
           8192 < (tweeter.averageLikes || 0),
           !tweeter.tweetFrequency,
           90 < (tweeter.tweetFrequency || 0),
