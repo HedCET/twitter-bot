@@ -185,7 +185,7 @@ export class TwitterService {
               $set.tweets = status.user.statuses_count;
             else $unset.tweets = true;
 
-            const tweeter = await this.usersTable.findOne(
+            let tweeter = await this.usersTable.findOne(
               { _id: status.user.id_str },
               fromPairs(this.appProps.map(i => [i, 0])),
             );
@@ -226,19 +226,18 @@ export class TwitterService {
                   $set.tweetFrequency;
             }
 
-            await this.usersTable.updateOne(
+            tweeter = await this.usersTable.findOneAndUpdate(
               { _id: status.user.id_str },
               { $addToSet, $set, $unset },
-              { upsert: true },
+              { returnOriginal: false, upsert: true },
             );
 
             if (
-              (
-                await this.settingsTable.updateOne(
-                  { _id: `${_id}|since_id`, value: { $lt: status.id_str } },
-                  { $set: { value: status.id_str } },
-                )
-              ).n
+              await this.settingsTable.findOneAndUpdate(
+                { _id: `${_id}|since_id`, value: { $lt: status.id_str } },
+                { $set: { value: status.id_str } },
+                { returnOriginal: false },
+              )
             ) {
               newTweets++;
 
@@ -264,12 +263,7 @@ export class TwitterService {
                     await ns.execute({
                       client: ns.client,
                       executor: omit(ns.executor, this.appProps),
-                      tweeter:
-                        tweeter ||
-                        (await this.usersTable.findOne(
-                          { _id: status.user.id_str },
-                          fromPairs(this.appProps.map(i => [i, 0])),
-                        )),
+                      tweeter: omit(tweeter, this.appProps),
                       status,
                     });
                   } catch (e) {
@@ -302,7 +296,7 @@ export class TwitterService {
         roles: { $size: 0 },
         tweeted_at: {
           $lt: moment()
-            .subtract(6, 'months')
+            .subtract(90, 'days')
             .toDate(),
         },
       });
