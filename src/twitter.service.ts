@@ -34,7 +34,7 @@ export class TwitterService {
   ) {}
 
   // scheduled search
-  @Cron('0 */5 * * * *')
+  @Cron('0 */3 * * * *')
   private async search(query?: searchQuery) {
     // get executors
     (
@@ -120,7 +120,7 @@ export class TwitterService {
           ).value,
         };
 
-        for (let i = 0; i < 60; i++) {
+        for (let i = 0; i < 36; i++) {
           const response: {
             _headers: { [key: string]: any };
             statuses: tweetInterface[];
