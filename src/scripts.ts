@@ -26,7 +26,7 @@ export const scripts = {
         executor._id !== tweeter._id &&
         (768 < (tweeter.averageFollowers || 0) ||
           256 < (tweeter.averageFriends || 0) ||
-          2304 < (tweeter.averageLikes || 0) ||
+          6912 < (tweeter.averageLikes || 0) ||
           !tweeter.tweetFrequency ||
           90 < (tweeter.tweetFrequency || 0)) &&
         !status.retweeted && // with searchQuery
