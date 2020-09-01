@@ -24,9 +24,9 @@ export const scripts = {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
-        (768 < (tweeter.averageFollowers || 0) ||
+        (1024 < (tweeter.averageFollowers || 0) ||
           256 < (tweeter.averageFriends || 0) ||
-          6912 < (tweeter.averageLikes || 0) ||
+          8192 < (tweeter.averageLikes || 0) ||
           !tweeter.tweetFrequency ||
           90 < (tweeter.tweetFrequency || 0)) &&
         !status.retweeted && // with searchQuery
