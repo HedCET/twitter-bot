@@ -3,10 +3,10 @@ export const scripts = {
   // executor[object] | tweeter[Object] =>
   //   {
   //      _id: String;
-  //      averageFollowers?: Number;
-  //      averageFriends?: Number;
-  //      averageLikes?: Number;
-  //      averageLists?: Number;
+  //      averageFollowers?: Number; // per day
+  //             Friends?: Number;
+  //             Likes?: Number;
+  //             Lists?: Number;
   //      createdAt?: Date;
   //      followers?: Number;
   //      friends?: Number;
@@ -14,7 +14,7 @@ export const scripts = {
   //      lists?: Number;
   //      name: String;
   //      tweetedAt?: Date;
-  //      tweetFrequency?: Number;
+  //      tweetFrequency?: Number; // duration in days
   //      tweets?: Number;
   //   }
   // status[Object] => https://developer.twitter.com/en/docs/twitter-api/v1/data-dictionary/overview/intro-to-tweet-json
@@ -24,7 +24,7 @@ export const scripts = {
     async execute({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 7 < (tweeter.tweetFrequency || 0)) &&
+        (!tweeter.tweetFrequency || 7 < tweeter.tweetFrequency) &&
         !status.retweeted && // with searchQuery
         !status.full_text.startsWith(
           `RT @${status.retweeted_status?.user?.screen_name}: ${(
