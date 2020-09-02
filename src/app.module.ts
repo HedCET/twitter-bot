@@ -37,6 +37,7 @@ import { WordartService } from './wordart.service';
   imports: [
     MongooseModule.forRoot(env.MONGO_URL, {
       useCreateIndex: true,
+      useFindAndModify: false,
       useNewUrlParser: true,
       useUnifiedTopology: true,
     }),
