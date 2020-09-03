@@ -9,7 +9,7 @@ import * as mongoose from 'mongoose';
 import { AppModule } from './app.module';
 import { env } from './env.validations';
 
-mongoose.set('debug', env.NODE_ENV === 'production' ? false : true);
+// mongoose.set('debug', env.NODE_ENV === 'production' ? false : true);
 
 const bootstrap = async () => {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
