@@ -36,6 +36,8 @@ import { WordartService } from './wordart.service';
   controllers: [AppController, TwitterAuthController],
   imports: [
     MongooseModule.forRoot(env.MONGO_URL, {
+      // debug: env.NODE_ENV === 'production' ? false : true,
+      returnOriginal: false,
       useCreateIndex: true,
       useFindAndModify: false,
       useNewUrlParser: true,

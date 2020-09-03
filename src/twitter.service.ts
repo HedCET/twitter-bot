@@ -115,7 +115,7 @@ export class TwitterService {
             (await this.settingsTable.findOneAndUpdate(
               { _id: `${_id}|since_id` },
               { $set: { value: '0' } },
-              { returnOriginal: false, upsert: true },
+              { upsert: true },
             ))
           ).value,
         };
@@ -229,14 +229,13 @@ export class TwitterService {
             tweeter = await this.usersTable.findOneAndUpdate(
               { _id: status.user.id_str },
               { $addToSet, $set, $unset },
-              { returnOriginal: false, upsert: true },
+              { upsert: true },
             );
 
             if (
               await this.settingsTable.findOneAndUpdate(
                 { _id: `${_id}|since_id`, value: { $lt: status.id_str } },
                 { $set: { value: status.id_str } },
-                { returnOriginal: false },
               )
             ) {
               newTweets++;
