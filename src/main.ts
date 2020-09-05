@@ -4,9 +4,13 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import * as compression from 'compression';
 import * as expressRateLimit from 'express-rate-limit';
 import * as helmet from 'helmet';
+import * as mongoose from 'mongoose';
 
 import { AppModule } from './app.module';
 import { env } from './env.validations';
+
+// mongoose.set('debug', env.NODE_ENV === 'production' ? false : true);
+mongoose.set('returnOriginal', false);
 
 const bootstrap = async () => {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {

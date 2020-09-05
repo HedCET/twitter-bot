@@ -2,6 +2,15 @@ import { Document, Schema } from 'mongoose';
 
 import { name as twitterAppsRef } from './twitterApps.table';
 
+// private appProps
+export const appProps = [
+  'accessRevoked',
+  'accessTokenKey',
+  'accessTokenSecret',
+  'roles',
+  'twitterApp',
+];
+
 // table model
 export interface model extends Document {
   _id: String;

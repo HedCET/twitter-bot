@@ -12,20 +12,16 @@ import {
   name as settingsToken,
 } from './settings.table';
 import { searchQuery, tweetInterface } from './twitter.interface';
-import { model as usersModel, name as usersToken } from './users.table';
+import {
+  appProps,
+  model as usersModel,
+  name as usersToken,
+} from './users.table';
 
 const Twitter = require('twitter-lite');
 
 @Injectable()
 export class TwitterService {
-  private readonly appProps = [
-    'accessRevoked',
-    'accessTokenKey',
-    'accessTokenSecret',
-    'roles',
-    'twitterApp',
-  ];
-
   constructor(
     private readonly logger: Logger,
     @InjectModel(settingsToken)
@@ -187,7 +183,7 @@ export class TwitterService {
 
             let tweeter = await this.usersTable.findOne(
               { _id: status.user.id_str },
-              fromPairs(this.appProps.map(i => [i, 0])),
+              fromPairs(appProps.map(i => [i, 0])),
             );
 
             if (tweeter && tweetedAt.isAfter(tweeter.tweetedAt)) {
@@ -261,8 +257,8 @@ export class TwitterService {
                   try {
                     await ns.then({
                       client: ns.client,
-                      executor: omit(ns.executor, this.appProps),
-                      tweeter: omit(tweeter, this.appProps),
+                      executor: omit(ns.executor, appProps),
+                      tweeter: omit(tweeter, appProps),
                       status,
                     });
                   } catch (e) {

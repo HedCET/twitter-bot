@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { fromPairs } from 'lodash';
 import { Model } from 'mongoose';
 
-import { model, name } from './users.table';
+import { appProps, model, name } from './users.table';
 
 @Injectable()
 export class AppService {
@@ -12,21 +13,21 @@ export class AppService {
   async search(query: string = '', tags: string = '') {
     const name = new RegExp(query, 'i');
 
+    // hits
     const hits = await this.usersTable.find(
       { name, ...(tags && { tags: { $in: tags.split('|') } }) },
-      { name: 1 },
+      fromPairs(appProps.map(i => [i, 0])),
       { limit: 10, sort: { tweetedAt: 'desc' } },
     );
 
-    return {
-      hits: hits.map(hit => hit.name),
-      total:
-        hits.length < 10
-          ? hits.length
-          : await this.usersTable.countDocuments({
-              name,
-              ...(tags && { tags: { $in: tags.split('|') } }),
-            }),
-    };
+    const total =
+      hits.length < 10
+        ? hits.length
+        : await this.usersTable.countDocuments({
+            name,
+            ...(tags && { tags: { $in: tags.split('|') } }),
+          });
+
+    return { hits, total };
   }
 }

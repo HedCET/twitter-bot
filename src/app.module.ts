@@ -36,19 +36,22 @@ import { WordartService } from './wordart.service';
   controllers: [AppController, TwitterAuthController],
   imports: [
     MongooseModule.forRoot(env.MONGO_URL, {
-      // debug: env.NODE_ENV === 'production' ? false : true,
-      returnOriginal: false,
+      connectionName: 'kandamkori',
+      poolSize: 10,
       useCreateIndex: true,
       useFindAndModify: false,
       useNewUrlParser: true,
       useUnifiedTopology: true,
     }),
-    MongooseModule.forFeature([
-      { name: cachedWordArtsTableName, schema: cachedWordArtsTableSchema },
-      { name: settingsTableName, schema: settingsTableSchema },
-      { name: twitterAppsTableName, schema: twitterAppsTableSchema },
-      { name: usersTableName, schema: usersTableSchema },
-    ]),
+    MongooseModule.forFeature(
+      [
+        { name: cachedWordArtsTableName, schema: cachedWordArtsTableSchema },
+        { name: settingsTableName, schema: settingsTableSchema },
+        { name: twitterAppsTableName, schema: twitterAppsTableSchema },
+        { name: usersTableName, schema: usersTableSchema },
+      ],
+      'kandamkori',
+    ),
     JwtModule.register({ secret: env.SECRET }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     CacheModule.register({ max: 1000 * 60, ttl: 900 }),

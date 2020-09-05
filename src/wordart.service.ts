@@ -94,23 +94,22 @@ export class WordartService {
           .subtract((i + 1) * 15, 'minutes')
           .toISOString();
 
+        const limit = random(60, 90);
         const prop =
           key === 'tweeted_at' ? 'tweetFrequency' : `average${capitalize(key)}`;
 
-        // dynamic projection
-        const users = await this.usersTable.find(
+        for (const user of await this.usersTable.find(
           {
+            [prop]: { $gt: 0 },
             ...(tags && { tags: { $in: tags.split('|') } }),
-            tweetedAt: { $gte: $set.startedAt },
+            ...(prop === 'tweetFrequency'
+              ? { tweetFrequency: { $gt: 7 } }
+              : { tweetedAt: { $gte: $set.startedAt } }),
           },
           { name: 1, [prop]: 1 },
-          { limit: 90, sort: { tweetedAt: 'desc' } },
-        );
-        for (const user of users)
-          if (
-            !find($set.tweeters, { key: user.name }) &&
-            (prop === 'tweetFrequency' ? 7 : 0) < (user[prop] || 0)
-          )
+          { limit, sort: { tweetedAt: 'desc' } },
+        ))
+          if (!find($set.tweeters, { key: user.name }))
             $set.tweeters.push({
               key: user.name,
               value: Math.ceil(user[prop]),
