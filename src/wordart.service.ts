@@ -107,7 +107,10 @@ export class WordartService {
           { limit: 90, sort: { tweetedAt: 'desc' } },
         );
         for (const user of users)
-          if (!find($set.tweeters, { key: user.name }) && 0 < (user[prop] || 0))
+          if (
+            !find($set.tweeters, { key: user.name }) &&
+            (prop === 'tweetFrequency' ? 7 : 0) < (user[prop] || 0)
+          )
             $set.tweeters.push({
               key: user.name,
               value: Math.ceil(user[prop]),
