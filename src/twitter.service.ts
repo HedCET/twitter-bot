@@ -259,7 +259,7 @@ export class TwitterService {
                   );
 
                   try {
-                    await ns.execute({
+                    await ns.then({
                       client: ns.client,
                       executor: omit(ns.executor, this.appProps),
                       tweeter: omit(tweeter, this.appProps),

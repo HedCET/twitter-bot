@@ -21,7 +21,16 @@ export const scripts = {
 
   // https://twitter.com/crawlamma
   crawlamma: {
-    async execute({ client, executor, tweeter, status }) {
+    // search/tweets => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/search/api-reference/get-search-tweets
+    searchQuery: {
+      count: 100,
+      lang: 'ml',
+      q: '%2A', // '*',
+      result_type: 'recent',
+      tweet_mode: 'extended',
+    },
+
+    async then({ client, executor, tweeter, status }) {
       if (
         executor._id !== tweeter._id &&
         (!tweeter.tweetFrequency || 7 < tweeter.tweetFrequency) &&
@@ -35,20 +44,13 @@ export const scripts = {
         // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
         await client.post('statuses/retweet', { id: status.id_str });
     },
-
-    // search/tweets => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/search/api-reference/get-search-tweets
-    searchQuery: {
-      count: 100,
-      lang: 'ml',
-      q: '%2A', // '*',
-      result_type: 'recent',
-      tweet_mode: 'extended',
-    },
   },
 
   // https://twitter.com/kulukulu0033
   // kulukulu0033: {
-  //   async execute({ client, executor, tweeter, status }) {
+  //   searchQuery: 'crawlamma.searchQuery', // attach to crawlamma as children
+
+  //   async then({ client, executor, tweeter, status }) {
   //     if (
   //       executor._id !== tweeter._id &&
   //       status.full_text.match(/സ്വാമിന.*/g) &&
@@ -60,7 +62,5 @@ export const scripts = {
   //     )
   //       await client.post('statuses/retweet', { id: status.id_str });
   //   },
-
-  //   searchQuery: 'crawlamma.searchQuery', // attach to crawlamma as children
   // },
 };
