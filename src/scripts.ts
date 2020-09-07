@@ -1,4 +1,4 @@
-const fetch = require('node-fetch');
+const moment = require('moment');
 
 export const scripts = {
   // client[Instance] => https://www.npmjs.com/package/twitter-lite
@@ -47,54 +47,24 @@ export const scripts = {
           await client.post('statuses/retweet', { id: status.id_str });
 
         // profile lastUpdatedAt
-        const lastUpdatedAt = new Date().getTime();
+        const lastUpdatedAt = moment();
 
         if (
-          (this.lastUpdatedAt || 0) < lastUpdatedAt &&
-          status.user.description.match(/[\u0d00-\u0d7f]/) &&
-          status.user.profile_banner_url &&
-          status.user.profile_image_url &&
-          !status.user.verified
+          moment(this.lastUpdatedAt || 0).isBefore(lastUpdatedAt) &&
+          status.user.description.match(/[\u0d00-\u0d7f]/)
         ) {
-          this.lastUpdatedAt = lastUpdatedAt + 1000 * 60;
+          this.lastUpdatedAt = lastUpdatedAt.add(1, 'minute');
 
-          const {
-            description,
-            location,
-            name,
-            profile_banner_url,
-            profile_image_url,
-            profile_link_color,
-            url,
-          } = status.user;
-
-          await fetch(profile_banner_url)
-            .then(res => res.buffer())
-            .then(async res => {
-              // account/update_profile_banner => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile_banner
-              await client.post('account/update_profile_banner', {
-                banner: res.toString('base64'),
-              });
-            });
-
-          await fetch(profile_image_url.replace(/_(bigger|mini|normal)\./, '.'))
-            .then(res => res.buffer())
-            .then(async res => {
-              // account/update_profile_image => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile_image
-              await client.post('account/update_profile_image', {
-                image: res.toString('base64'),
-                skip_status: true,
-              });
-            });
+          // profile description
+          const description = `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`;
 
           // account/update_profile => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile
           await client.post('account/update_profile', {
-            description,
-            location: location || '',
-            name,
-            profile_link_color,
+            description:
+              160 < description.length
+                ? `${description.substr(0, 157)}...`
+                : description,
             skip_status: true,
-            url: url || '',
           });
         }
       }

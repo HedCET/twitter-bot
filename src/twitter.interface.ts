@@ -16,9 +16,6 @@ export interface tweeterInterface {
   id_str: string;
   listed_count: number;
   name: string;
-  profile_banner_url: string;
-  profile_image_url: string;
-  profile_link_color: string;
   screen_name: string;
   statuses_count: number;
 }
