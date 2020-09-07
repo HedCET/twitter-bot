@@ -1,3 +1,5 @@
+const fetch = require('node-fetch');
+
 export const scripts = {
   // client[Instance] => https://www.npmjs.com/package/twitter-lite
   // executor[object] | tweeter[Object] =>
@@ -31,18 +33,71 @@ export const scripts = {
     },
 
     async then({ client, executor, tweeter, status }) {
-      if (
-        executor._id !== tweeter._id &&
-        (!tweeter.tweetFrequency || 7 < tweeter.tweetFrequency) &&
-        !status.retweeted && // with searchQuery
-        !status.full_text.startsWith(
-          `RT @${status.retweeted_status?.user?.screen_name}: ${(
-            status.retweeted_status?.full_text || ''
-          ).substr(0, 110)}`,
+      if (executor._id !== tweeter._id) {
+        if (
+          (!tweeter.tweetFrequency || 7 < tweeter.tweetFrequency) &&
+          !status.retweeted && // with searchQuery
+          !status.full_text.startsWith(
+            `RT @${status.retweeted_status?.user?.screen_name}: ${(
+              status.retweeted_status?.full_text || ''
+            ).substr(0, 110)}`,
+          )
         )
-      )
-        // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
-        await client.post('statuses/retweet', { id: status.id_str });
+          // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
+          await client.post('statuses/retweet', { id: status.id_str });
+
+        // profile lastUpdatedAt
+        const lastUpdatedAt = new Date().getTime();
+
+        if (
+          (this.lastUpdatedAt || 0) < lastUpdatedAt &&
+          status.user.description.match(/[\u0d00-\u0d7f]/) &&
+          status.user.profile_banner_url &&
+          status.user.profile_image_url &&
+          !status.user.verified
+        ) {
+          this.lastUpdatedAt = lastUpdatedAt + 1000 * 60;
+
+          const {
+            description,
+            location,
+            name,
+            profile_banner_url,
+            profile_image_url,
+            profile_link_color,
+            url,
+          } = status.user;
+
+          await fetch(profile_banner_url)
+            .then(res => res.buffer())
+            .then(async res => {
+              // account/update_profile_banner => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile_banner
+              await client.post('account/update_profile_banner', {
+                banner: res.toString('base64'),
+              });
+            });
+
+          await fetch(profile_image_url.replace(/_(bigger|mini|normal)\./, '.'))
+            .then(res => res.buffer())
+            .then(async res => {
+              // account/update_profile_image => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile_image
+              await client.post('account/update_profile_image', {
+                image: res.toString('base64'),
+                skip_status: true,
+              });
+            });
+
+          // account/update_profile => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile
+          await client.post('account/update_profile', {
+            description,
+            location: location || '',
+            name,
+            profile_link_color,
+            skip_status: true,
+            url: url || '',
+          });
+        }
+      }
     },
   },
 

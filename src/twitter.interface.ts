@@ -9,11 +9,16 @@ export interface searchQuery {
 
 export interface tweeterInterface {
   created_at: string;
+  description: string;
   favourites_count: number;
   followers_count: number;
   friends_count: number;
   id_str: string;
   listed_count: number;
+  name: string;
+  profile_banner_url: string;
+  profile_image_url: string;
+  profile_link_color: string;
   screen_name: string;
   statuses_count: number;
 }

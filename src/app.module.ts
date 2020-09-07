@@ -37,7 +37,6 @@ import { WordartService } from './wordart.service';
   imports: [
     MongooseModule.forRoot(env.MONGO_URL, {
       connectionName: 'kandamkori',
-      poolSize: 10,
       useCreateIndex: true,
       useFindAndModify: false,
       useNewUrlParser: true,
