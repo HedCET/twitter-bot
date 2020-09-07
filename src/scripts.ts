@@ -57,7 +57,9 @@ export const scripts = {
           this.lastUpdatedAt = lastUpdatedAt.add(1, 'minute');
 
           // profile description
-          const description = `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`;
+          const description = `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`
+            .replace(/\s+/g, ' ')
+            .trim();
 
           // account/update_profile => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile
           await client.post('account/update_profile', {
