@@ -51,7 +51,8 @@ export const scripts = {
 
         if (
           moment(this.lastUpdatedAt || 0).isBefore(lastUpdatedAt) &&
-          status.user.description.match(/[\u0d00-\u0d7f]/)
+          (status.user.name.match(/[\u0d00-\u0d7f]/) ||
+            status.user.description.match(/[\u0d00-\u0d7f]/))
         ) {
           this.lastUpdatedAt = lastUpdatedAt.add(1, 'minute');
 
