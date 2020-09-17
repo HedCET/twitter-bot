@@ -1,4 +1,4 @@
-const moment = require('moment');
+import * as moment from 'moment';
 
 export const scripts = {
   // client[Instance] => https://www.npmjs.com/package/twitter-lite
@@ -34,6 +34,8 @@ export const scripts = {
 
     async then({ client, executor, tweeter, status }) {
       if (executor._id !== tweeter._id) {
+        const updatedAt = moment();
+
         if (
           (!tweeter.tweetFrequency || 7 < tweeter.tweetFrequency) &&
           !status.retweeted && // with searchQuery
@@ -46,18 +48,16 @@ export const scripts = {
           // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
           await client.post('statuses/retweet', { id: status.id_str });
 
-        // profile lastUpdatedAt
-        const lastUpdatedAt = moment();
-
         if (
-          moment(this.lastUpdatedAt || 0).isBefore(lastUpdatedAt) &&
+          moment(this.profileUpdatedAt || 0).isBefore(updatedAt) &&
           (status.user.name.match(/[\u0d00-\u0d7f]/) ||
             status.user.description.match(/[\u0d00-\u0d7f]/))
         ) {
-          this.lastUpdatedAt = lastUpdatedAt.add(1, 'minute');
+          this.profileUpdatedAt = updatedAt.clone().add(1, 'minute');
 
-          // profile description
-          const description = `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`;
+          const description = `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`
+            .replace(/\s+/g, ' ')
+            .trim();
 
           // account/update_profile => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile
           await client.post('account/update_profile', {

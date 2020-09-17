@@ -107,7 +107,14 @@ export class WordartService {
               : { tweetedAt: { $gte: $set.startedAt } }),
           },
           { name: 1, [prop]: 1 },
-          { limit, sort: { tweetedAt: 'desc' } },
+          {
+            limit,
+            sort: {
+              [prop === 'tweetFrequency'
+                ? 'tweetFrequency'
+                : 'tweetedAt']: 'desc',
+            },
+          },
         ))
           $set.tweeters.push({
             key: user.name,
