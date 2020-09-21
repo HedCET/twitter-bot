@@ -24,5 +24,6 @@ export interface tweetInterface {
   created_at: string;
   full_text: string;
   id_str: string;
+  entities?: any;
   user: tweeterInterface;
 }

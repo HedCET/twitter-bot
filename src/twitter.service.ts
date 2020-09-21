@@ -105,13 +105,13 @@ export class TwitterService {
 
         const requestQuery: searchQuery = {
           ...ns.searchQuery,
-          ...(query || {}),
+          ...(query ?? {}),
           since_id: (
             (await this.settingsTable.findOne({ _id: `${_id}|since_id` })) ||
             (await this.settingsTable.findOneAndUpdate(
               { _id: `${_id}|since_id` },
               { $set: { value: '0' } },
-              { upsert: true },
+              { returnOriginal: false, upsert: true },
             ))
           ).value,
         };
@@ -151,7 +151,7 @@ export class TwitterService {
             ]);
 
             const $addToSet: { [key: string]: any } = {
-              tags: tag || twitterApp,
+              tags: tag ?? twitterApp,
             };
             const $set: { [key: string]: any } = {
               createdAt: moment(status.user.created_at, [
@@ -225,7 +225,7 @@ export class TwitterService {
             tweeter = await this.usersTable.findOneAndUpdate(
               { _id: status.user.id_str },
               { $addToSet, $set, $unset },
-              { upsert: true },
+              { returnOriginal: false, upsert: true },
             );
 
             if (
@@ -236,7 +236,7 @@ export class TwitterService {
             ) {
               newTweets++;
 
-              [ns].concat(ns.children || []).forEach(async ns => {
+              [ns].concat(ns.children ?? []).forEach(async ns => {
                 if (
                   moment.isMoment(ns.reset) &&
                   moment(ns.reset).isAfter(moment())

@@ -1,3 +1,4 @@
+import { groupBy, last, sampleSize, sortBy } from 'lodash';
 import * as moment from 'moment';
 
 export const scripts = {
@@ -36,22 +37,63 @@ export const scripts = {
       if (executor._id !== tweeter._id) {
         const updatedAt = moment();
 
+        if (moment(this.sessionExpiredAt ?? 0).isBefore(updatedAt)) {
+          this.sessionExpiredAt = updatedAt.clone().add(3, 'minutes');
+
+          if ((this.retweeted ?? 5) < 5 && 30 < (this.tweets ?? []).length) {
+            const tweets = [];
+
+            for (const group of Object.values(
+              groupBy(this.tweets, 'tweeterName'),
+            ))
+              tweets.push(last(sortBy(group, ['tweetFrequency'])));
+
+            if (30 < tweets.length) {
+              sampleSize(tweets, 5 - this.retweeted).forEach(async tweet => {
+                try {
+                  await client.post('statuses/retweet', { id: tweet.tweetId }); // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
+                } catch (e) {
+                  console.error(`${tweet.tweeterName}/${tweet.tweetId}`, e);
+                }
+              });
+
+              this.tweets = [];
+            }
+          }
+
+          this.retweeted = 5 < (this.retweeted ?? 0) ? this.retweeted - 5 : 0;
+        }
+
         if (
-          (!tweeter.tweetFrequency || 7 < tweeter.tweetFrequency) &&
+          status.full_text.match(/[\u0d00-\u0d7f]{3,}/) &&
           !status.retweeted && // with searchQuery
           !status.full_text.startsWith(
             `RT @${status.retweeted_status?.user?.screen_name}: ${(
-              status.retweeted_status?.full_text || ''
+              status.retweeted_status?.full_text ?? ''
             ).substr(0, 110)}`,
           )
         )
-          // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
-          await client.post('statuses/retweet', { id: status.id_str });
+          if (!tweeter.tweetFrequency || 7 < tweeter.tweetFrequency) {
+            this.retweeted += 1;
+            await client.post('statuses/retweet', { id: status.id_str }); // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
+          } else if (
+            !(status.entities?.urls ?? []).filter(
+              i => !i.expanded_url.match(/^https?:\/\/(t\.co|twitter\.com)\//),
+            ).length
+          )
+            this.tweets = [
+              ...(this.tweets ?? []),
+              {
+                tweeterName: tweeter.name,
+                tweetFrequency: tweeter.tweetFrequency,
+                tweetId: status.id_str,
+              },
+            ];
 
         if (
           moment(this.profileUpdatedAt || 0).isBefore(updatedAt) &&
-          (status.user.name.match(/[\u0d00-\u0d7f]/) ||
-            status.user.description.match(/[\u0d00-\u0d7f]/))
+          (status.user.name.match(/[\u0d00-\u0d7f]{3,}/) ||
+            status.user.description.match(/[\u0d00-\u0d7f]{3,}/))
         ) {
           this.profileUpdatedAt = updatedAt.clone().add(1, 'minute');
 
@@ -82,7 +124,7 @@ export const scripts = {
   //       status.full_text.match(/സ്വാമിന.*/g) &&
   //       !status.full_text.startsWith(
   //         `RT @${status.retweeted_status?.user?.screen_name}: ${(
-  //           status.retweeted_status?.full_text || ''
+  //           status.retweeted_status?.full_text ?? ''
   //         ).substr(0, 110)}`,
   //       )
   //     )

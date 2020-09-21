@@ -109,11 +109,7 @@ export class WordartService {
           { name: 1, [prop]: 1 },
           {
             limit,
-            sort: {
-              [prop === 'tweetFrequency'
-                ? 'tweetFrequency'
-                : 'tweetedAt']: 'desc',
-            },
+            sort: { tweetedAt: 'desc' },
           },
         ))
           $set.tweeters.push({
