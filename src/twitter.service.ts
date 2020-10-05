@@ -1,16 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
+import * as BigInt from 'big-integer';
 import { fromPairs, has, omit, sortBy } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
 
 import { scripts } from './scripts';
-import {
-  model as settingsModel,
-  name as settingsToken,
-} from './settings.table';
+import { model as recentModel, name as recentToken } from './recent.table';
 import { searchQuery, tweetInterface } from './twitter.interface';
 import {
   appProps,
@@ -24,8 +22,8 @@ const Twitter = require('twitter-lite');
 export class TwitterService {
   constructor(
     private readonly logger: Logger,
-    @InjectModel(settingsToken)
-    private readonly settingsTable: Model<settingsModel>,
+    @InjectModel(recentToken)
+    private readonly recentTable: Model<recentModel>,
     @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
   ) {}
 
@@ -106,14 +104,6 @@ export class TwitterService {
         const requestQuery: searchQuery = {
           ...ns.searchQuery,
           ...(query ?? {}),
-          since_id: (
-            (await this.settingsTable.findOne({ _id: `${_id}|since_id` })) ||
-            (await this.settingsTable.findOneAndUpdate(
-              { _id: `${_id}|since_id` },
-              { $set: { value: '0' } },
-              { returnOriginal: false, upsert: true },
-            ))
-          ).value,
         };
 
         for (let i = 0; i < 36; i++) {
@@ -141,6 +131,11 @@ export class TwitterService {
 
           // ascending sort
           const statuses = sortBy(response.statuses, ['id_str']);
+
+          // set max_id for next iteration
+          requestQuery.max_id = BigInt(statuses[0].id_str)
+            .subtract(1)
+            .toString();
 
           // new tweets counter
           let newTweets = 0;
@@ -229,58 +224,76 @@ export class TwitterService {
             );
 
             if (
-              await this.settingsTable.findOneAndUpdate(
-                { _id: `${_id}|since_id`, value: { $lt: status.id_str } },
-                { $set: { value: status.id_str } },
-              )
+              !(await this.recentTable.findOne({
+                _id: `${_id}|${status.id_str}`,
+              }))
             ) {
               newTweets++;
 
-              [ns].concat(ns.children ?? []).forEach(async ns => {
-                if (
-                  moment.isMoment(ns.reset) &&
-                  moment(ns.reset).isAfter(moment())
-                )
-                  this.logger.error(
-                    `skipping, +${moment
-                      .duration(ns.reset.diff(moment()))
-                      .asMilliseconds()}ms to reset`,
-                    `${status.user.screen_name}/${status.id_str}`,
-                    `TwitterService/search/${ns.executor.name}`,
-                  );
-                else {
-                  this.logger.log(
-                    `${status.user.screen_name}/${status.id_str}`,
-                    `TwitterService/search/${ns.executor.name}`,
-                  );
+              await new this.recentTable({
+                _id: `${_id}|${status.id_str}`,
+              }).save();
 
-                  try {
-                    await ns.then({
-                      client: ns.client,
-                      executor: omit(ns.executor, appProps),
-                      tweeter: omit(tweeter, appProps),
-                      status,
-                    });
-                  } catch (e) {
+              if (!tweeter.blacklisted)
+                [ns].concat(ns.children ?? []).forEach(async ns => {
+                  if (
+                    moment.isMoment(ns.reset) &&
+                    moment(ns.reset).isAfter(moment())
+                  )
                     this.logger.error(
-                      e,
+                      `skipping, +${moment
+                        .duration(ns.reset.diff(moment()))
+                        .asMilliseconds()}ms to reset`,
+                      `${status.user.screen_name}/${status.id_str}`,
+                      `TwitterService/search/${ns.executor.name}`,
+                    );
+                  else {
+                    this.logger.log(
                       `${status.user.screen_name}/${status.id_str}`,
                       `TwitterService/search/${ns.executor.name}`,
                     );
 
-                    if (
-                      has(e, 'errors') &&
-                      -1 < [185].indexOf(e.errors[0].code)
-                    )
-                      ns.reset = moment().add(1, 'minutes');
+                    try {
+                      await ns.then({
+                        client: ns.client,
+                        executor: omit(ns.executor, appProps),
+                        tweeter: omit(tweeter, appProps),
+                        status,
+                      });
+                    } catch (e) {
+                      this.logger.error(
+                        e,
+                        `${status.user.screen_name}/${status.id_str}`,
+                        `TwitterService/search/${ns.executor.name}`,
+                      );
+
+                      if (
+                        has(e, 'errors') &&
+                        -1 < [185].indexOf(e.errors[0].code)
+                      )
+                        ns.reset = moment().add(1, 'minutes');
+                    }
                   }
-                }
-              });
+                });
             }
           }
 
           if (!newTweets) break;
         }
+
+        const limit = await this.recentTable.findOne(
+          { _id: new RegExp(`^${_id}\\|`) },
+          null,
+          { skip: 100000, sort: { _id: 'desc' } },
+        );
+
+        if (limit)
+          await this.recentTable.deleteMany({
+            $and: [
+              { _id: new RegExp(`^${_id}\\|`) },
+              { _id: { $lte: limit._id } },
+            ],
+          });
       });
 
     if (

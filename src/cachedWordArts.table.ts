@@ -5,8 +5,8 @@ import { Document, Schema } from 'mongoose';
 // table model
 export interface model extends Document {
   _id: String;
+  json: String;
   startedAt: Date;
-  stringifiedJSON: String;
   tweeters: String[];
 }
 
@@ -17,8 +17,8 @@ export const name = 'cachedWordArts';
 export const schema = new Schema(
   {
     _id: String,
+    json: { required: true, type: String },
     startedAt: { required: true, type: Date },
-    stringifiedJSON: { required: true, type: String },
     tweeters: [{ required: true, type: String }],
   },
   {

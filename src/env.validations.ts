@@ -6,18 +6,33 @@ import * as path from 'path';
 import { isURL } from 'validator';
 
 const schema = {
-  AMQP_QUEUE_NAME: joi.string().required(),
-  AMQP_URL: joi.string().required().uri(),
-  MONGO_URL: joi.string().required().uri(),
+  BANNER_IMAGE_URLS: joi.string(),
+  MONGO_URL: joi
+    .string()
+    .required()
+    .uri(),
   NODE_ENV: joi.string().default('development'),
   PORT: joi.number().default(8080),
-  ROOT_URL: joi.string().uri().default('http://localhost:8080'),
+  ROOT_URL: joi
+    .string()
+    .uri()
+    .default('http://localhost:8080'),
   SECRET: joi.string().default('secret'),
+  TWEETSHOT_AMQP_QUEUE_NAME: joi.string().required(),
+  TWEETSHOT_AMQP_URL: joi
+    .string()
+    .required()
+    .uri(),
   TWITTER_CALLBACK_URL: joi
     .string()
     .uri()
     .default('http://localhost:8080/twitter_callback'),
-  WORDART_IMAGE_URLS: joi.string().default(''),
+  WORDART_AMQP_QUEUE_NAME: joi.string().required(),
+  WORDART_AMQP_URL: joi
+    .string()
+    .required()
+    .uri(),
+  WORDART_IMAGE_URLS: joi.string(),
 };
 
 const { error, value } = joi.validate(
@@ -25,9 +40,9 @@ const { error, value } = joi.validate(
     ...dotenv.parse(
       fs.existsSync(path.resolve(process.env.ENV_FILEPATH || './.development'))
         ? fs.readFileSync(
-          path.resolve(process.env.ENV_FILEPATH || './.development'),
-          { encoding: 'utf8' },
-        )
+            path.resolve(process.env.ENV_FILEPATH || './.development'),
+            { encoding: 'utf8' },
+          )
         : '',
     ),
     ...pick(process.env, keys(schema)),
@@ -36,6 +51,11 @@ const { error, value } = joi.validate(
 );
 
 if (error) throw error;
+
+// custom validation for BANNER_IMAGE_URLS
+if (value.BANNER_IMAGE_URLS)
+  for (const url of value.BANNER_IMAGE_URLS.split('|'))
+    if (!isURL(url)) throw new Error(`invalid URL BANNER_IMAGE_URLS ${url}`);
 
 // custom validation for WORDART_IMAGE_URLS
 if (value.WORDART_IMAGE_URLS)

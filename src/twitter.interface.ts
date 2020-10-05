@@ -1,9 +1,9 @@
 export interface searchQuery {
   count: number;
   lang: string;
+  max_id?: string;
   q: string;
   result_type: string;
-  since_id?: string;
   tweet_mode: string;
 }
 

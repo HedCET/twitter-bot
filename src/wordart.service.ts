@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { connect, connection } from 'amqplib';
+import { request } from 'amqplib-rpc';
 import { capitalize, find, pick, random, shuffle } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 import { isJSON } from 'validator';
 
-import { AmqpService } from './amqp.service';
 import {
   model as cachedWordArtsModel,
   name as cachedWordArtsToken,
@@ -15,7 +16,9 @@ import { model as usersModel, name as usersToken } from './users.table';
 
 @Injectable()
 export class WordartService {
-  private readonly urls = env.WORDART_IMAGE_URLS.split('|');
+  private readonly urls = env.WORDART_IMAGE_URLS
+    ? env.WORDART_IMAGE_URLS.split('|')
+    : [];
   private readonly services = [
     'followers',
     'friends',
@@ -24,9 +27,9 @@ export class WordartService {
     'tweeted_at',
   ];
   private index = random(this.urls.length);
+  private amqp: connection;
 
   constructor(
-    private readonly amqpService: AmqpService,
     @InjectModel(cachedWordArtsToken)
     private readonly cachedWordArtsTable: Model<cachedWordArtsModel>,
     private readonly logger: Logger,
@@ -37,7 +40,7 @@ export class WordartService {
   async wordart(key: string = '', tags: string = '') {
     const cachedWordArts = await this.cachedWordArtsTable.find(
       { _id: { $in: this.services.map(i => `${i}|${tags}`) } },
-      { stringifiedJSON: 0 },
+      { json: 0 },
     );
     // .populate({ select: '_id,name', path: 'users', match: { tags } });
 
@@ -47,9 +50,9 @@ export class WordartService {
           (
             await this.cachedWordArtsTable.findOne(
               { _id: `${key}|${tags}` },
-              { stringifiedJSON: 1 },
+              { json: 1 },
             )
-          ).stringifiedJSON,
+          ).json,
         );
       else {
         cachedWordArts.forEach(async ({ _id, startedAt }) => {
@@ -94,7 +97,7 @@ export class WordartService {
           .subtract((i + 1) * 15, 'minutes')
           .toISOString();
 
-        const limit = random(60, 90);
+        const limit = random(200, 400);
         const prop =
           key === 'tweeted_at' ? 'tweetFrequency' : `average${capitalize(key)}`;
 
@@ -119,25 +122,18 @@ export class WordartService {
       }
 
       if ($set.tweeters.length) {
+        if (!this.amqp) this.amqp = await connect(env.WORDART_AMQP_URL);
+
         let content;
 
         try {
           content = (
-            await this.amqpService.request(
-              {},
-              {
-                sendOpts: {
-                  headers: {
-                    // randomizing images
-                    image: this.urls[this.index++ % this.urls.length],
-                    // words in csv format
-                    words: $set.tweeters
-                      .map(i => `${i.key};${i.value}`)
-                      .join('\n'),
-                  },
-                },
-              },
-            )
+            await request(this.amqp, env.WORDART_AMQP_QUEUE_NAME, {
+              image: this.urls.length
+                ? this.urls[this.index++ % this.urls.length]
+                : '',
+              words: $set.tweeters.map(i => `${i.key};${i.value}`).join('\n'),
+            })
           ).content.toString();
         } catch (e) {
           this.logger.error(e, e.message, `WordartService/${key}/${tags}`);
@@ -145,20 +141,20 @@ export class WordartService {
 
         if (content) {
           if (isJSON(content)) {
-            const json = JSON.parse(content);
+            const cloud = JSON.parse(content);
 
             this.logger.log(
-              pick(json, ['statusCode', 'statusText']),
+              pick(cloud, ['statusCode', 'statusText']),
               `WordartService/${key}/${tags}`,
             );
 
-            if (json.statusCode === 200)
+            if (cloud.statusCode === 200)
               await this.cachedWordArtsTable.updateOne(
                 { _id: `${key}|${tags}` },
                 {
                   $set: {
                     ...$set,
-                    stringifiedJSON: JSON.stringify(json.response),
+                    json: cloud.json,
                     tweeters: $set.tweeters.map(i => i.key),
                   },
                 },
@@ -168,7 +164,7 @@ export class WordartService {
           } else
             this.logger.error(
               content,
-              'invalid JSON response.content',
+              'invalid JSON content',
               `WordartService/${key}/${tags}`,
             );
         }

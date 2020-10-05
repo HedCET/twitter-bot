@@ -1,5 +1,15 @@
-import { groupBy, last, sampleSize, sortBy } from 'lodash';
+import { connect, connection } from 'amqplib';
+import { request } from 'amqplib-rpc';
+import { groupBy, last, random, sampleSize, sortBy } from 'lodash';
 import * as moment from 'moment';
+import * as fetch from 'node-fetch';
+import { isJSON } from 'validator';
+
+import { env } from './env.validations';
+
+const urls = env.BANNER_IMAGE_URLS ? env.BANNER_IMAGE_URLS.split('|') : [];
+let index = random(urls.length);
+let amqp: connection;
 
 export const scripts = {
   // client[Instance] => https://www.npmjs.com/package/twitter-lite
@@ -37,8 +47,8 @@ export const scripts = {
       if (executor._id !== tweeter._id) {
         const updatedAt = moment();
 
-        if (moment(this.sessionExpiredAt ?? 0).isBefore(updatedAt)) {
-          this.sessionExpiredAt = updatedAt.clone().add(3, 'minutes');
+        if (moment(this.loopExpiredAt ?? 0).isBefore(updatedAt)) {
+          this.loopExpiredAt = updatedAt.clone().add(3, 'minutes');
 
           if ((this.retweeted ?? 5) < 5 && 30 < (this.tweets ?? []).length) {
             const tweets = [];
@@ -51,7 +61,9 @@ export const scripts = {
             if (30 < tweets.length) {
               sampleSize(tweets, 5 - this.retweeted).forEach(async tweet => {
                 try {
-                  await client.post('statuses/retweet', { id: tweet.tweetId }); // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
+                  await client.post('statuses/retweet', {
+                    id: tweet.tweetId,
+                  }); // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
                 } catch (e) {
                   console.error(`${tweet.tweeterName}/${tweet.tweetId}`, e);
                 }
@@ -91,11 +103,12 @@ export const scripts = {
             ];
 
         if (
-          moment(this.profileUpdatedAt || 0).isBefore(updatedAt) &&
+          moment(this.descriptionUpdatedAt ?? 0).isBefore(updatedAt) &&
           (status.user.name.match(/[\u0d00-\u0d7f]{3,}/) ||
-            status.user.description.match(/[\u0d00-\u0d7f]{3,}/))
+            status.user.description.match(/[\u0d00-\u0d7f]{3,}/)) &&
+          !(this.promotedUsers ?? []).includes(status.user.id_str)
         ) {
-          this.profileUpdatedAt = updatedAt.clone().add(1, 'minute');
+          this.descriptionUpdatedAt = updatedAt.clone().add(1, 'minute');
 
           const description = `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`
             .replace(/\s+/g, ' ')
@@ -109,6 +122,76 @@ export const scripts = {
                 : description,
             skip_status: true,
           });
+
+          this.promotedUsers = [
+            ...(!this.promotedUsers || 7 * 24 * 60 < this.promotedUsers.length
+              ? []
+              : this.promotedUsers),
+            status.user.id_str,
+          ];
+        }
+
+        if (status.full_text.match(/ക്രോ(ള|ള്ള)(മ്മ|മ്മെ|മ്മേ)/g))
+          this.tweetshots = [
+            ...(this.tweetshots ?? []),
+            {
+              tweeterName: tweeter.name,
+              tweetId: status.id_str,
+            },
+          ];
+
+        if (moment(this.bannerUpdatedAt ?? 0).isBefore(updatedAt)) {
+          this.bannerUpdatedAt = updatedAt.clone().add(1, 'minute');
+
+          if (this.tweetshots?.length) {
+            if (!amqp) amqp = await connect(env.TWEETSHOT_AMQP_URL);
+
+            const tweet = this.tweetshots.shift();
+            let content;
+
+            try {
+              content = (
+                await request(amqp, env.TWEETSHOT_AMQP_QUEUE_NAME, tweet)
+              ).content.toString();
+            } catch (e) {
+              console.error(`${tweet.tweeterName}/${tweet.tweetId}`, e);
+            }
+
+            if (content) {
+              if (isJSON(content)) {
+                const { base64, statusCode, statusText } = JSON.parse(content);
+
+                if (statusCode === 200) {
+                  // account/update_profile_banner => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile_banner
+                  await client.post('account/update_profile_banner', {
+                    banner: base64,
+                  });
+
+                  this.bannerUpdatedAt = updatedAt.clone().add(5, 'minutes');
+                } else
+                  console.error(
+                    `${tweet.tweeterName}/${tweet.tweetId}`,
+                    statusText,
+                  );
+              } else
+                console.error(
+                  `${tweet.tweeterName}/${tweet.tweetId}`,
+                  'invalid JSON content',
+                  content,
+                );
+            }
+          } else {
+            if (urls.length)
+              await fetch(urls[index++ % urls.length])
+                .then(res => res.buffer())
+                .then(async res => {
+                  // account/update_profile_banner => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile_banner
+                  await client.post('account/update_profile_banner', {
+                    banner: res.toString('base64'),
+                  });
+                });
+            else await client.post('account/remove_profile_banner'); // account/remove_profile_banner => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-remove_profile_banner
+          }
         }
       }
     },
