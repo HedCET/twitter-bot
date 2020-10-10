@@ -1,12 +1,13 @@
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as joi from 'joi';
-import { keys, pick } from 'lodash';
+import { compact, keys, pick } from 'lodash';
 import * as path from 'path';
 import { isURL } from 'validator';
 
 const schema = {
   BANNER_IMAGE_URLS: joi.string(),
+  LOCATIONS: joi.string(),
   MONGO_URL: joi
     .string()
     .required()
@@ -41,7 +42,7 @@ const { error, value } = joi.validate(
       fs.existsSync(path.resolve(process.env.ENV_FILEPATH || './.development'))
         ? fs.readFileSync(
             path.resolve(process.env.ENV_FILEPATH || './.development'),
-            { encoding: 'utf8' },
+            'utf8',
           )
         : '',
     ),
@@ -54,12 +55,24 @@ if (error) throw error;
 
 // custom validation for BANNER_IMAGE_URLS
 if (value.BANNER_IMAGE_URLS)
-  for (const url of value.BANNER_IMAGE_URLS.split('|'))
+  for (const url of compact(value.BANNER_IMAGE_URLS.split('|')))
     if (!isURL(url)) throw new Error(`invalid URL BANNER_IMAGE_URLS ${url}`);
+
+// custom loading for LOCATIONS
+if (!value.LOCATIONS && fs.existsSync(path.resolve('./.locations')))
+  value.LOCATIONS = fs
+    .readFileSync(path.resolve('./.locations'), 'utf8')
+    .replace(/\n/g, '|');
+
+// custom loading for WORDART_IMAGE_URLS
+if (!value.WORDART_IMAGE_URLS && fs.existsSync(path.resolve('./.wordarts')))
+  value.WORDART_IMAGE_URLS = fs
+    .readFileSync(path.resolve('./.wordarts'), 'utf8')
+    .replace(/\n/g, '|');
 
 // custom validation for WORDART_IMAGE_URLS
 if (value.WORDART_IMAGE_URLS)
-  for (const url of value.WORDART_IMAGE_URLS.split('|'))
+  for (const url of compact(value.WORDART_IMAGE_URLS.split('|')))
     if (!isURL(url)) throw new Error(`invalid URL WORDART_IMAGE_URLS ${url}`);
 
 export const env: { [key: string]: any } = value;

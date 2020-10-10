@@ -1,14 +1,29 @@
 import { connect, connection } from 'amqplib';
 import { request } from 'amqplib-rpc';
-import { groupBy, last, random, sampleSize, sortBy } from 'lodash';
+import {
+  compact,
+  groupBy,
+  last,
+  random,
+  sampleSize,
+  shuffle,
+  sortBy,
+} from 'lodash';
 import * as moment from 'moment';
 import * as fetch from 'node-fetch';
 import { isJSON } from 'validator';
 
 import { env } from './env.validations';
 
-const urls = env.BANNER_IMAGE_URLS ? env.BANNER_IMAGE_URLS.split('|') : [];
-let index = random(urls.length);
+const urls = env.BANNER_IMAGE_URLS
+  ? shuffle(compact(env.BANNER_IMAGE_URLS.split('|')))
+  : [];
+const locations = env.LOCATIONS
+  ? shuffle(compact(env.LOCATIONS.split('|')))
+  : [];
+
+let urlIndex = random(urls.length);
+let locationIndex = random(locations.length);
 let amqp: connection;
 
 export const scripts = {
@@ -103,16 +118,23 @@ export const scripts = {
             ];
 
         if (
-          moment(this.descriptionUpdatedAt ?? 0).isBefore(updatedAt) &&
+          moment(this.profileUpdatedAt ?? 0).isBefore(updatedAt) &&
           (status.user.name.match(/[\u0d00-\u0d7f]{3,}/) ||
             status.user.description.match(/[\u0d00-\u0d7f]{3,}/)) &&
           !(this.promotedUsers ?? []).includes(status.user.id_str)
         ) {
-          this.descriptionUpdatedAt = updatedAt.clone().add(1, 'minute');
+          this.profileUpdatedAt = updatedAt.clone().add(1, 'minute');
 
           const description = `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`
             .replace(/\s+/g, ' ')
             .trim();
+          const location =
+            (locations.length
+              ? compact(
+                  locations[locationIndex++ % locations.length].split(/, ?/),
+                )
+              : []
+            ).join(', ') || 'കേരളം';
 
           // account/update_profile => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile
           await client.post('account/update_profile', {
@@ -120,6 +142,7 @@ export const scripts = {
               160 < description.length
                 ? `${description.substr(0, 157)}...`
                 : description,
+            location,
             skip_status: true,
           });
 
@@ -182,7 +205,7 @@ export const scripts = {
             }
           } else {
             if (urls.length)
-              await fetch(urls[index++ % urls.length])
+              await fetch(urls[urlIndex++ % urls.length])
                 .then(res => res.buffer())
                 .then(async res => {
                   // account/update_profile_banner => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile_banner

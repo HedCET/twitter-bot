@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { connect, connection } from 'amqplib';
 import { request } from 'amqplib-rpc';
-import { capitalize, find, pick, random, shuffle } from 'lodash';
+import { capitalize, compact, find, pick, random, shuffle } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 import { isJSON } from 'validator';
@@ -17,7 +17,7 @@ import { model as usersModel, name as usersToken } from './users.table';
 @Injectable()
 export class WordartService {
   private readonly urls = env.WORDART_IMAGE_URLS
-    ? env.WORDART_IMAGE_URLS.split('|')
+    ? shuffle(compact(env.WORDART_IMAGE_URLS.split('|')))
     : [];
   private readonly services = [
     'followers',
