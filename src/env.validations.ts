@@ -7,7 +7,6 @@ import { isURL } from 'validator';
 
 const schema = {
   BANNER_IMAGE_URLS: joi.string(),
-  LOCATIONS: joi.string(),
   MONGO_URL: joi
     .string()
     .required()
@@ -57,12 +56,6 @@ if (error) throw error;
 if (value.BANNER_IMAGE_URLS)
   for (const url of compact(value.BANNER_IMAGE_URLS.split('|')))
     if (!isURL(url)) throw new Error(`invalid URL BANNER_IMAGE_URLS ${url}`);
-
-// custom loading for LOCATIONS
-if (!value.LOCATIONS && fs.existsSync(path.resolve('./.locations')))
-  value.LOCATIONS = fs
-    .readFileSync(path.resolve('./.locations'), 'utf8')
-    .replace(/\n/g, '|');
 
 // custom loading for WORDART_IMAGE_URLS
 if (!value.WORDART_IMAGE_URLS && fs.existsSync(path.resolve('./.wordarts')))

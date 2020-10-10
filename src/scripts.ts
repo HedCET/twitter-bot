@@ -18,12 +18,8 @@ import { env } from './env.validations';
 const urls = env.BANNER_IMAGE_URLS
   ? shuffle(compact(env.BANNER_IMAGE_URLS.split('|')))
   : [];
-const locations = env.LOCATIONS
-  ? shuffle(compact(env.LOCATIONS.split('|')))
-  : [];
 
 let urlIndex = random(urls.length);
-let locationIndex = random(locations.length);
 let amqp: connection;
 
 export const scripts = {
@@ -128,13 +124,6 @@ export const scripts = {
           const description = `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`
             .replace(/\s+/g, ' ')
             .trim();
-          const location =
-            (locations.length
-              ? compact(
-                  locations[locationIndex++ % locations.length].split(/, ?/),
-                )
-              : []
-            ).join(', ') || 'കേരളം';
 
           // account/update_profile => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile
           await client.post('account/update_profile', {
@@ -142,7 +131,6 @@ export const scripts = {
               160 < description.length
                 ? `${description.substr(0, 157)}...`
                 : description,
-            location,
             skip_status: true,
           });
 
