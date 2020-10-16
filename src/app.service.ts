@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { fromPairs } from 'lodash';
 import { Model } from 'mongoose';
 
 import { appProps, model, name } from './users.table';
@@ -16,7 +15,7 @@ export class AppService {
     // hits
     const hits = await this.usersTable.find(
       { name, ...(tags && { tags: { $in: tags.split('|') } }) },
-      fromPairs(appProps.map(i => [i, 0])),
+      (appProps ?? []).reduce((m, i) => ({ ...m, [i]: 0 }), {}),
       { limit: 10, sort: { tweetedAt: 'desc' } },
     );
 

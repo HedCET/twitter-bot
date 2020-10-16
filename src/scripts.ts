@@ -1,14 +1,6 @@
 import { connect, connection } from 'amqplib';
 import { request } from 'amqplib-rpc';
-import {
-  compact,
-  groupBy,
-  last,
-  random,
-  sampleSize,
-  shuffle,
-  sortBy,
-} from 'lodash';
+import { compact, groupBy, random, sampleSize, shuffle, sortBy } from 'lodash';
 import * as moment from 'moment';
 import * as fetch from 'node-fetch';
 import { isJSON } from 'validator';
@@ -64,19 +56,26 @@ export const scripts = {
           if ((this.retweeted ?? 5) < 5 && 30 < (this.tweets ?? []).length) {
             const tweets = [];
 
-            for (const group of Object.values(
-              groupBy(this.tweets, 'tweeterName'),
-            ))
-              tweets.push(last(sortBy(group, ['tweetFrequency'])));
+            Object.values(groupBy(this.tweets, 'tweeterName')).forEach(group =>
+              tweets.push(sortBy(group, ['tweetFrequency']).pop()),
+            );
 
             if (30 < tweets.length) {
               sampleSize(tweets, 5 - this.retweeted).forEach(async tweet => {
                 try {
-                  await client.post('statuses/retweet', {
-                    id: tweet.tweetId,
-                  }); // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
+                  await client.post('statuses/retweet', { id: tweet.tweetId }); // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
                 } catch (e) {
                   console.error(`${tweet.tweeterName}/${tweet.tweetId}`, e);
+
+                  if ('errors' in e)
+                    switch (e.errors[0].code) {
+                      case 136:
+                        this.blocked = [
+                          ...(this.blocked ?? []),
+                          tweet.tweeterId,
+                        ];
+                        break;
+                    }
                 }
               });
 
@@ -107,6 +106,7 @@ export const scripts = {
             this.tweets = [
               ...(this.tweets ?? []),
               {
+                tweeterId: status.user.id_str,
                 tweeterName: tweeter.name,
                 tweetFrequency: tweeter.tweetFrequency,
                 tweetId: status.id_str,
@@ -142,7 +142,7 @@ export const scripts = {
           ];
         }
 
-        if (status.full_text.match(/ക്രോ(ള|ള്ള)(മ്മ|മ്മെ|മ്മേ)/g))
+        if (status.full_text.match(/(ക്രാ|ക്രൊ|ക്രോ)(ള|ള്ള)(മ്മ|മ്മെ|മ്മേ)/g))
           this.tweetshots = [
             ...(this.tweetshots ?? []),
             {
@@ -178,7 +178,7 @@ export const scripts = {
                     banner: base64,
                   });
 
-                  this.bannerUpdatedAt = updatedAt.clone().add(5, 'minutes');
+                  this.bannerUpdatedAt = updatedAt.clone().add(10, 'minutes');
                 } else
                   console.error(
                     `${tweet.tweeterName}/${tweet.tweetId}`,

@@ -7,7 +7,7 @@ export const appProps = [
   'accessRevoked',
   'accessTokenKey',
   'accessTokenSecret',
-  'blacklisted',
+  'blockedTimeout',
   'roles',
   'twitterApp',
 ];
@@ -22,7 +22,7 @@ export interface model extends Document {
   averageFriends?: Number;
   averageLikes?: Number;
   averageLists?: Number;
-  blacklisted?: Boolean;
+  blockedTimeout?: Date;
   createdAt?: Date;
   followers?: Number;
   friends?: Number;
@@ -51,7 +51,7 @@ export const schema = new Schema(
     averageFriends: Number,
     averageLikes: Number,
     averageLists: Number,
-    blacklisted: Boolean,
+    blockedTimeout: Date,
     createdAt: Date,
     followers: Number,
     friends: Number,

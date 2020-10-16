@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { fromPairs, has, omit, sortBy } from 'lodash';
+import { omit, sortBy } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
@@ -176,10 +176,9 @@ export class TwitterService {
               $set.tweets = status.user.statuses_count;
             else $unset.tweets = true;
 
-            let tweeter = await this.usersTable.findOne(
-              { _id: status.user.id_str },
-              fromPairs(appProps.map(i => [i, 0])),
-            );
+            let tweeter = await this.usersTable.findOne({
+              _id: status.user.id_str,
+            });
 
             if (tweeter && tweetedAt.isAfter(tweeter.tweetedAt)) {
               // tweet frequency per day
@@ -234,7 +233,7 @@ export class TwitterService {
                 _id: `${_id}|${status.id_str}`,
               }).save();
 
-              if (!tweeter.blacklisted)
+              if (moment(tweeter.blockedTimeout ?? 0).isBefore(moment()))
                 [ns].concat(ns.children ?? []).forEach(async ns => {
                   if (
                     moment.isMoment(ns.reset) &&
@@ -267,12 +266,38 @@ export class TwitterService {
                         `TwitterService/search/${ns.executor.name}`,
                       );
 
-                      if (
-                        has(e, 'errors') &&
-                        -1 < [185].indexOf(e.errors[0].code)
-                      )
-                        ns.reset = moment().add(1, 'minutes');
+                      if ('errors' in e)
+                        switch (e.errors[0].code) {
+                          case 136:
+                            await this.usersTable.updateOne(
+                              { _id: status.user.id_str },
+                              {
+                                $set: {
+                                  blockedTimeout: moment()
+                                    .add(90, 'days')
+                                    .toDate(),
+                                },
+                              },
+                            );
+                            break;
+
+                          case 185:
+                            ns.reset = moment().add(1, 'minute');
+                            break;
+                        }
                     }
+
+                    while ((ns.blocked ?? []).length)
+                      await this.usersTable.updateOne(
+                        { _id: ns.blocked.shift() },
+                        {
+                          $set: {
+                            blockedTimeout: moment()
+                              .add(90, 'days')
+                              .toDate(),
+                          },
+                        },
+                      );
                   }
                 });
             }
