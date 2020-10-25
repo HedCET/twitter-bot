@@ -10,6 +10,7 @@ import {
   name as cachedWordArtsTableName,
   schema as cachedWordArtsTableSchema,
 } from './cachedWordArts.table';
+import { CrawlammaService } from './crawlamma.service';
 import { env } from './env.validations';
 import { JwtStrategy } from './jwt.strategy';
 import {
@@ -18,7 +19,6 @@ import {
 } from './recent.table';
 import { TwitterAuthController } from './twitter.auth.controller';
 import { TwitterAuthService } from './twitter.auth.service';
-import { TwitterService } from './twitter.service';
 import {
   name as twitterAppsTableName,
   schema as twitterAppsTableSchema,
@@ -54,7 +54,7 @@ import { WordartService } from './wordart.service';
     JwtStrategy,
     AppService,
     TwitterAuthService,
-    TwitterService,
+    CrawlammaService,
     WordartService,
     Logger,
   ],

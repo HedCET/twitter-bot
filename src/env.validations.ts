@@ -6,7 +6,6 @@ import * as path from 'path';
 import { isURL } from 'validator';
 
 const schema = {
-  BANNER_IMAGE_URLS: joi.string(),
   MONGO_URL: joi
     .string()
     .required()
@@ -18,11 +17,6 @@ const schema = {
     .uri()
     .default('http://localhost:8080'),
   SECRET: joi.string().default('secret'),
-  TWEETSHOT_AMQP_QUEUE_NAME: joi.string().required(),
-  TWEETSHOT_AMQP_URL: joi
-    .string()
-    .required()
-    .uri(),
   TWITTER_CALLBACK_URL: joi
     .string()
     .uri()
@@ -51,11 +45,6 @@ const { error, value } = joi.validate(
 );
 
 if (error) throw error;
-
-// custom validation for BANNER_IMAGE_URLS
-if (value.BANNER_IMAGE_URLS)
-  for (const url of compact(value.BANNER_IMAGE_URLS.split('|')))
-    if (!isURL(url)) throw new Error(`invalid URL BANNER_IMAGE_URLS ${url}`);
 
 // custom loading for WORDART_IMAGE_URLS
 if (!value.WORDART_IMAGE_URLS && fs.existsSync(path.resolve('./.wordarts')))

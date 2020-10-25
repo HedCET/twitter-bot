@@ -9,6 +9,7 @@ export const appProps = [
   'accessTokenSecret',
   'blockedTimeout',
   'roles',
+  'tags',
   'twitterApp',
 ];
 
