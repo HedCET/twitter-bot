@@ -1,15 +1,11 @@
-import { Document, Schema } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document } from 'mongoose';
 
-// table model
-export interface model extends Document {
+@Schema({ versionKey: false })
+export class Recent {
+  @Prop()
   _id: String;
 }
 
-// table name
-export const name = 'recent';
-
-// table schema
-export const schema = new Schema(
-  { _id: String },
-  { collection: name, versionKey: false },
-);
+export type RecentDocument = Recent & Document;
+export const RecentSchema = SchemaFactory.createForClass(Recent);

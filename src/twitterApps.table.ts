@@ -1,25 +1,23 @@
-import { Document, Schema } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document } from 'mongoose';
 
-// table model
-export interface model extends Document {
+@Schema({ versionKey: false })
+export class TwitterApp {
+  @Prop()
   _id: String;
+
+  @Prop({ required: true })
   consumerKey: String;
+
+  @Prop({ required: true })
   consumerSecret: String;
+
+  @Prop()
   deleted?: Boolean;
+
+  @Prop()
   tag?: String;
 }
 
-// table name
-export const name = 'twitterApps';
-
-// table schema
-export const schema = new Schema(
-  {
-    _id: String,
-    consumerKey: { required: true, type: String },
-    consumerSecret: { required: true, type: String },
-    deleted: Boolean,
-    tag: String,
-  },
-  { collection: name, versionKey: false },
-);
+export type TwitterAppDocument = TwitterApp & Document;
+export const TwitterAppSchema = SchemaFactory.createForClass(TwitterApp);

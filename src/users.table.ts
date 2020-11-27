@@ -1,9 +1,9 @@
-import { Document, Schema } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document } from 'mongoose';
 
-import { name as twitterAppsRef } from './twitterApps.table';
+import { TwitterApp } from './twitterApps.table';
 
-// private appProps
-export const appProps = [
+export const PrivateProps = [
   'accessRevoked',
   'accessTokenKey',
   'accessTokenSecret',
@@ -13,58 +13,71 @@ export const appProps = [
   'twitterApp',
 ];
 
-// table model
-export interface model extends Document {
+@Schema({ versionKey: false })
+export class User {
+  @Prop()
   _id: String;
+
+  @Prop()
   accessRevoked?: Boolean;
+
+  @Prop()
   accessTokenKey?: String;
+
+  @Prop()
   accessTokenSecret?: String;
+
+  @Prop()
   averageFollowers?: Number;
+
+  @Prop()
   averageFriends?: Number;
+
+  @Prop()
   averageLikes?: Number;
+
+  @Prop()
   averageLists?: Number;
+
+  @Prop()
   blockedTimeout?: Date;
+
+  @Prop()
   createdAt?: Date;
+
+  @Prop()
   followers?: Number;
+
+  @Prop()
   friends?: Number;
+
+  @Prop()
   likes?: Number;
+
+  @Prop()
   lists?: Number;
+
+  @Prop({ index: true, required: true })
   name: String;
+
+  @Prop([String])
   roles?: String[];
+
+  @Prop([String])
   tags?: String[];
+
+  @Prop()
   tweetedAt?: Date;
+
+  @Prop({ index: true })
   tweetFrequency?: Number;
+
+  @Prop()
   tweets?: Number;
+
+  @Prop({ ref: TwitterApp.name })
   twitterApp?: String;
 }
 
-// table name
-export const name = 'users';
-
-// table schema
-export const schema = new Schema(
-  {
-    _id: String,
-    accessRevoked: Boolean,
-    accessTokenKey: String,
-    accessTokenSecret: String,
-    averageFollowers: Number,
-    averageFriends: Number,
-    averageLikes: Number,
-    averageLists: Number,
-    blockedTimeout: Date,
-    createdAt: Date,
-    followers: Number,
-    friends: Number,
-    likes: Number,
-    lists: Number,
-    name: { index: true, required: true, type: String },
-    roles: [String],
-    tags: [String],
-    tweetedAt: { index: true, type: Date },
-    tweetFrequency: Number,
-    tweets: Number,
-    twitterApp: { ref: twitterAppsRef, type: String },
-  },
-  { collection: name, versionKey: false },
-);
+export type UserDocument = User & Document;
+export const UserSchema = SchemaFactory.createForClass(User);
