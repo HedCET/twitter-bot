@@ -75,8 +75,8 @@ export class User {
   @Prop()
   tweets?: Number;
 
-  @Prop({ ref: TwitterApp.name })
-  twitterApp?: String;
+  @Prop({ ref: TwitterApp.name, type: String })
+  twitterApp?: TwitterApp;
 }
 
 export type UserDocument = User & Document;

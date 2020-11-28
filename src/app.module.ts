@@ -6,27 +6,15 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import {
-  name as cachedWordArtsTableName,
-  schema as cachedWordArtsTableSchema,
-} from './cachedWordArts.table';
+import { CachedWordArt, CachedWordArtSchema } from './cachedWordArts.table';
 import { CrawlammaService } from './crawlamma.service';
 import { env } from './env.validations';
 import { JwtStrategy } from './jwt.strategy';
-import {
-  name as recentTableName,
-  schema as recentTableSchema,
-} from './recent.table';
+import { Recent, RecentSchema } from './recent.table';
 import { TwitterAuthController } from './twitter.auth.controller';
 import { TwitterAuthService } from './twitter.auth.service';
-import {
-  name as twitterAppsTableName,
-  schema as twitterAppsTableSchema,
-} from './twitterApps.table';
-import {
-  name as usersTableName,
-  schema as usersTableSchema,
-} from './users.table';
+import { TwitterApp, TwitterAppSchema } from './twitterApps.table';
+import { User, UserSchema } from './users.table';
 import { WordartService } from './wordart.service';
 
 @Global()
@@ -40,10 +28,10 @@ import { WordartService } from './wordart.service';
       useUnifiedTopology: true,
     }),
     MongooseModule.forFeature([
-      { name: cachedWordArtsTableName, schema: cachedWordArtsTableSchema },
-      { name: recentTableName, schema: recentTableSchema },
-      { name: twitterAppsTableName, schema: twitterAppsTableSchema },
-      { name: usersTableName, schema: usersTableSchema },
+      { name: CachedWordArt.name, schema: CachedWordArtSchema },
+      { name: Recent.name, schema: RecentSchema },
+      { name: TwitterApp.name, schema: TwitterAppSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     JwtModule.register({ secret: env.SECRET }),
     PassportModule.register({ defaultStrategy: 'jwt' }),

@@ -9,11 +9,8 @@ import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
 
 import { env } from './env.validations';
-import {
-  model as twitterAppsModel,
-  name as twitterAppsToken,
-} from './twitterApps.table';
-import { model as usersModel, name as usersToken } from './users.table';
+import { TwitterApp, TwitterAppDocument } from './twitterApps.table';
+import { User, UserDocument } from './users.table';
 
 const Twitter = require('twitter-lite');
 
@@ -21,16 +18,16 @@ const Twitter = require('twitter-lite');
 export class TwitterAuthService {
   constructor(
     private readonly jwtService: JwtService,
-    @InjectModel(twitterAppsToken)
-    private readonly twitterAppsTable: Model<twitterAppsModel>,
-    @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
+    @InjectModel(TwitterApp.name)
+    private readonly twitterAppModel: Model<TwitterAppDocument>,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
   async getTwitterToken(_id: string = '') {
     const {
       consumerKey: consumer_key,
       consumerSecret: consumer_secret,
-    } = await this.twitterAppsTable.findOne({ _id, deleted: { $ne: true } });
+    } = await this.twitterAppModel.findOne({ _id, deleted: { $ne: true } });
 
     if (consumer_key && consumer_secret)
       return await new Twitter({
@@ -48,7 +45,7 @@ export class TwitterAuthService {
       const {
         consumerKey: consumer_key,
         consumerSecret: consumer_secret,
-      } = await this.twitterAppsTable.findOne({
+      } = await this.twitterAppModel.findOne({
         _id: twitterApp,
         deleted: { $ne: true },
       });
@@ -64,7 +61,7 @@ export class TwitterAuthService {
           consumer_secret,
         }).getAccessToken({ oauth_token, oauth_verifier });
 
-        await this.usersTable.updateOne(
+        await this.userModel.updateOne(
           { _id },
           {
             $addToSet: { roles: 'user' },

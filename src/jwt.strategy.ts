@@ -6,11 +6,13 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 
 import { env } from './env.validations';
 import { jwtPayload } from './jwt.payload.interface';
-import { model, name } from './users.table';
+import { User, UserDocument } from './users.table';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(@InjectModel(name) private readonly usersTable: Model<model>) {
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: env.SECRET,
@@ -18,7 +20,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: jwtPayload) {
-    const user = await this.usersTable.findOne(
+    const user = await this.userModel.findOne(
       { _id: payload._id },
       { _id: 1, roles: 1 },
     );

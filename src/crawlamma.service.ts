@@ -7,9 +7,9 @@ import * as moment from 'moment';
 import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
 
-import { model as recentModel, name as recentToken } from './recent.table';
+import { Recent, RecentDocument } from './recent.table';
 import { searchQuery, tweetInterface } from './twitter.interface';
-import { model as usersModel, name as usersToken } from './users.table';
+import { User, UserDocument } from './users.table';
 
 const Twitter = require('twitter-lite');
 
@@ -19,16 +19,16 @@ export class CrawlammaService {
 
   constructor(
     private readonly logger: Logger,
-    @InjectModel(recentToken)
-    private readonly recentTable: Model<recentModel>,
-    @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
+    @InjectModel(Recent.name)
+    private readonly recentModel: Model<RecentDocument>,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
-  @Cron('0,15,30,45 * * * * *')
+  @Cron('*/15 * * * * *')
   private async scheduler(twitterApp = 'crawlamma') {
     // get executors
     (
-      await this.usersTable
+      await this.userModel
         .find({
           accessRevoked: { $ne: true },
           accessTokenKey: { $exists: true },
@@ -74,7 +74,7 @@ export class CrawlammaService {
           );
 
           // accessRevoked
-          await this.usersTable.updateOne(
+          await this.userModel.updateOne(
             { _id },
             { $set: { accessRevoked: true } },
           );
@@ -86,7 +86,7 @@ export class CrawlammaService {
         if (!this.cache[cacheKey]) this.cache[cacheKey] = {};
         const cache = this.cache[cacheKey];
 
-        const [avg] = await this.usersTable.aggregate([
+        const [avg] = await this.userModel.aggregate([
           { $match: { tags: tag ?? twitterApp } },
           { $group: { _id: '', avg: { $avg: '$tweetFrequency' } } },
         ]);
@@ -173,7 +173,7 @@ export class CrawlammaService {
               $set.tweets = status.user.statuses_count;
             else $unset.tweets = true;
 
-            let tweeter = await this.usersTable.findOne({
+            let tweeter = await this.userModel.findOne({
               _id: status.user.id_str,
             });
 
@@ -213,7 +213,7 @@ export class CrawlammaService {
                   $set.tweetFrequency;
             }
 
-            tweeter = await this.usersTable.findOneAndUpdate(
+            tweeter = await this.userModel.findOneAndUpdate(
               { _id: status.user.id_str },
               { $addToSet, $set, $unset },
               { returnOriginal: false, upsert: true },
@@ -221,7 +221,7 @@ export class CrawlammaService {
 
             if (
               _id !== tweeter._id &&
-              !(await this.recentTable.findOneAndUpdate(
+              !(await this.recentModel.findOneAndUpdate(
                 { _id: `${_id}|${status.id_str}` },
                 { $set: {} },
                 { upsert: true },
@@ -285,7 +285,7 @@ export class CrawlammaService {
                           if ('errors' in e)
                             switch (e.errors[0].code) {
                               case 136:
-                                await this.usersTable.updateOne(
+                                await this.userModel.updateOne(
                                   { _id: remainingTweet.tweeterId },
                                   {
                                     $set: {
@@ -343,7 +343,7 @@ export class CrawlammaService {
                         if ('errors' in e)
                           switch (e.errors[0].code) {
                             case 136:
-                              await this.usersTable.updateOne(
+                              await this.userModel.updateOne(
                                 { _id: status.user.id_str },
                                 {
                                   $set: {
@@ -428,14 +428,14 @@ export class CrawlammaService {
           if (!newTweets) break;
         }
 
-        const limit = await this.recentTable.findOne(
+        const limit = await this.recentModel.findOne(
           { _id: new RegExp(`^${_id}\\|`) },
           null,
           { skip: 60000, sort: { _id: 'desc' } },
         );
 
         if (limit)
-          await this.recentTable.deleteMany({
+          await this.recentModel.deleteMany({
             $and: [
               { _id: new RegExp(`^${_id}\\|`) },
               { _id: { $lte: limit._id } },
@@ -445,9 +445,9 @@ export class CrawlammaService {
 
     if (
       384 * 1024 * 1024 <
-      (await this.usersTable.collection.stats()).storageSize
+      (await this.userModel.collection.stats()).storageSize
     )
-      await this.usersTable.deleteMany({
+      await this.userModel.deleteMany({
         roles: { $size: 0 },
         tweeted_at: {
           $lt: moment()

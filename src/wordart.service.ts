@@ -7,12 +7,9 @@ import * as moment from 'moment';
 import { Model } from 'mongoose';
 import { isJSON } from 'validator';
 
-import {
-  model as cachedWordArtsModel,
-  name as cachedWordArtsToken,
-} from './cachedWordArts.table';
+import { CachedWordArt, CachedWordArtDocument } from './cachedWordArts.table';
 import { env } from './env.validations';
-import { model as usersModel, name as usersToken } from './users.table';
+import { User, UserDocument } from './users.table';
 
 @Injectable()
 export class WordartService {
@@ -26,64 +23,68 @@ export class WordartService {
     'lists',
     'tweeted_at',
   ];
+
   private index = random(this.urls.length);
   private amqp: connection;
 
   constructor(
-    @InjectModel(cachedWordArtsToken)
-    private readonly cachedWordArtsTable: Model<cachedWordArtsModel>,
+    @InjectModel(CachedWordArt.name)
+    private readonly cachedWordArtModel: Model<CachedWordArtDocument>,
     private readonly logger: Logger,
-    @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
   // wordart route handler
   async wordart(key: string = '', tags: string = '') {
-    const cachedWordArts = await this.cachedWordArtsTable.find(
+    const cachedWordArts = await this.cachedWordArtModel.find(
       { _id: { $in: this.services.map(i => `${i}|${tags}`) } },
       { json: 0 },
     );
-    // .populate({ select: '_id,name', path: 'users', match: { tags } });
 
-    if (cachedWordArts.length) {
+    if (cachedWordArts.length)
       if (find(cachedWordArts, { _id: `${key}|${tags}` }))
         return JSON.parse(
           (
-            await this.cachedWordArtsTable.findOne(
+            await this.cachedWordArtModel.findOne(
               { _id: `${key}|${tags}` },
               { json: 1 },
             )
           ).json,
         );
       else {
-        cachedWordArts.forEach(async ({ _id, startedAt }) => {
-          if (moment(startedAt).isBefore(moment().subtract(15, 'minutes'))) {
-            const [key, tags] = _id.split('|');
-            await this.cache(key, tags);
-          }
-        });
+        this.services
+          .map(
+            service =>
+              find(cachedWordArts, { _id: `${service}|${tags}` }) ?? {
+                _id: `${service}|${tags}`,
+                startedAt: 0,
+              },
+          )
+          .forEach(async ({ _id, startedAt }) => {
+            if (moment(startedAt).isBefore(moment().subtract(15, 'minutes'))) {
+              const [key, tags] = _id.split('|');
+              await this.upsert(key, tags);
+            }
+          });
 
-        const json = {};
-
-        // metadata response
-        for (const { _id, startedAt, tweeters } of shuffle(cachedWordArts))
-          json[_id.split('|')[0]] = {
-            hits: tweeters,
-            startedAt,
-          };
-
-        return json;
+        return shuffle(cachedWordArts).reduce(
+          (m: { [key: string]: any }, { _id, startedAt, tweeters: hits }) => ({
+            ...m,
+            [_id.split('|')[0]]: { hits, startedAt },
+          }),
+          {},
+        );
       }
-    } else {
-      await this.cache(key, tags);
-      return await this.wordart(key, tags);
-    }
+
+    await this.upsert(key, tags);
+    return await this.wordart(key, tags);
   }
 
-  // populate wordart
-  private async cache(key: string = '', tags: string = '') {
+  // upsert wordart
+  private async upsert(key: string = '', tags: string = '') {
     if (!key)
       for await (const service of this.services) // loop
-        await this.cache(service, tags);
+        await this.upsert(service, tags);
 
     if (-1 < this.services.indexOf(key)) {
       const prop =
@@ -91,7 +92,7 @@ export class WordartService {
       let propVal = 0;
 
       if (prop === 'tweetFrequency') {
-        const [avg] = await this.usersTable.aggregate([
+        const [avg] = await this.userModel.aggregate([
           { $match: { ...(tags && { tags: { $in: tags.split('|') } }) } },
           { $group: { _id: '', avg: { $avg: '$tweetFrequency' } } },
         ]);
@@ -111,10 +112,10 @@ export class WordartService {
           .subtract((i + 1) * 15, 'minutes')
           .toISOString();
 
-        for (const user of await this.usersTable.find(
+        for (const user of await this.userModel.find(
           {
             ...(tags && { tags: { $in: tags.split('|') } }),
-            tweetedAt: { $gte: $set.startedAt },
+            tweetedAt: { $gt: $set.startedAt },
             [prop]: { $gt: propVal },
           },
           { name: 1, [prop]: 1 },
@@ -160,7 +161,7 @@ export class WordartService {
           );
 
           if (cloud.statusCode === 200)
-            await this.cachedWordArtsTable.updateOne(
+            await this.cachedWordArtModel.updateOne(
               { _id: `${key}|${tags}` },
               {
                 $set: {
@@ -171,7 +172,7 @@ export class WordartService {
               },
               { upsert: true },
             );
-          else await this.cache(key, tags);
+          else await this.upsert(key, tags);
         } else
           this.logger.error(
             content,

@@ -1,12 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { isJSON } from 'validator';
 
 @Schema({ versionKey: false })
-export class Recent {
+export class CachedWordArt {
   @Prop({ required: true })
   _id: String;
 
-  @Prop()
+  @Prop({ validate: isJSON })
   json: String;
 
   @Prop({ required: true })
@@ -16,5 +17,5 @@ export class Recent {
   tweeters: String[];
 }
 
-export type RecentDocument = Recent & Document;
-export const RecentSchema = SchemaFactory.createForClass(Recent);
+export type CachedWordArtDocument = CachedWordArt & Document;
+export const CachedWordArtSchema = SchemaFactory.createForClass(CachedWordArt);
