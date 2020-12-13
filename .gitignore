@@ -4,7 +4,6 @@
 /dist
 
 # npm
-npm-debug.log*
 package-lock.json
 /node_modules
 
@@ -26,3 +25,6 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/settings.json
 !.vscode/tasks.json
+
+# yarn
+yarn.lock

@@ -1,4 +1,5 @@
 import { Document, Schema } from 'mongoose';
+import isJSON from 'validator/lib/isJSON';
 
 // import { name as usersRef } from './users.table';
 
@@ -17,7 +18,7 @@ export const name = 'cachedWordArts';
 export const schema = new Schema(
   {
     _id: String,
-    json: { required: true, type: String },
+    json: { required: true, type: String, validate: isJSON },
     startedAt: { required: true, type: Date },
     tweeters: [{ required: true, type: String }],
   },

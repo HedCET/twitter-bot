@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { connect, connection } from 'amqplib';
 import { request } from 'amqplib-rpc';
 import { capitalize, compact, find, pick, random, shuffle } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
-import { isJSON } from 'validator';
+import isJSON from 'validator/lib/isJSON';
 
 import {
   model as cachedWordArtsModel,
@@ -26,6 +26,7 @@ export class WordartService {
     'lists',
     'tweeted_at',
   ];
+
   private index = random(this.urls.length);
   private amqp: connection;
 
@@ -44,7 +45,7 @@ export class WordartService {
     );
     // .populate({ select: '_id,name', path: 'users', match: { tags } });
 
-    if (cachedWordArts.length) {
+    if (cachedWordArts.length)
       if (find(cachedWordArts, { _id: `${key}|${tags}` }))
         return JSON.parse(
           (
@@ -55,37 +56,54 @@ export class WordartService {
           ).json,
         );
       else {
-        cachedWordArts.forEach(async ({ _id, startedAt }) => {
-          if (moment(startedAt).isBefore(moment().subtract(30, 'minutes'))) {
-            const [key, tags] = _id.split('|');
-            await this.cache(key, tags);
-          }
-        });
+        this.services
+          .map(
+            service =>
+              find(cachedWordArts, { _id: `${service}|${tags}` }) ?? {
+                _id: `${service}|${tags}`,
+                startedAt: 0,
+              },
+          )
+          .forEach(async ({ _id, startedAt }) => {
+            if (moment(startedAt).isBefore(moment().subtract(15, 'minutes'))) {
+              const [key, tags] = _id.split('|');
+              await this.cache(key, tags);
+            }
+          });
 
-        const json = {};
-
-        // metadata response
-        for (const { _id, startedAt, tweeters } of shuffle(cachedWordArts))
-          json[_id.split('|')[0]] = {
-            hits: tweeters,
-            startedAt,
-          };
-
-        return json;
+        return shuffle(cachedWordArts).reduce(
+          (m: { [key: string]: any }, { _id, startedAt, tweeters: hits }) => ({
+            ...m,
+            [_id.split('|')[0]]: { hits, startedAt },
+          }),
+          {},
+        );
       }
-    } else {
-      await this.cache(key, tags);
-      return await this.wordart(key, tags);
-    }
+
+    await this.cache(key, tags);
+    throw new NotFoundException();
   }
 
-  // populate wordart
+  // cache wordart
   private async cache(key: string = '', tags: string = '') {
     if (!key)
-      for await (const service of this.services) // loop
-        await this.cache(service, tags);
+      this.services.forEach(async service => await this.cache(service, tags));
 
     if (-1 < this.services.indexOf(key)) {
+      const prop =
+        key === 'tweeted_at' ? 'tweetFrequency' : `average${capitalize(key)}`;
+      let propVal = 0;
+
+      if (prop === 'tweetFrequency') {
+        const [avg] = await this.usersTable.aggregate([
+          { $match: { ...(tags && { tags: { $in: tags.split('|') } }) } },
+          { $group: { _id: '', avg: { $avg: '$tweetFrequency' } } },
+        ]);
+
+        // average tweet frequency
+        propVal = avg?.avg ?? 7;
+      }
+
       const $set = {
         startedAt: moment().toISOString(),
         tweeters: [],
@@ -97,21 +115,15 @@ export class WordartService {
           .subtract((i + 1) * 15, 'minutes')
           .toISOString();
 
-        const limit = random(200, 400);
-        const prop =
-          key === 'tweeted_at' ? 'tweetFrequency' : `average${capitalize(key)}`;
-
         for (const user of await this.usersTable.find(
           {
-            [prop]: { $gt: 0 },
             ...(tags && { tags: { $in: tags.split('|') } }),
-            ...(prop === 'tweetFrequency'
-              ? { tweetFrequency: { $gt: 7 } }
-              : { tweetedAt: { $gte: $set.startedAt } }),
+            tweetedAt: { $gte: $set.startedAt },
+            [prop]: { $gt: propVal },
           },
           { name: 1, [prop]: 1 },
           {
-            limit,
+            limit: random(200, 400),
             sort: { tweetedAt: 'desc' },
           },
         ))
@@ -129,45 +141,47 @@ export class WordartService {
         try {
           content = (
             await request(this.amqp, env.WORDART_AMQP_QUEUE_NAME, {
+              words: $set.tweeters.map(i => `${i.key};${i.value}`).join('\n'),
               image: this.urls.length
                 ? this.urls[this.index++ % this.urls.length]
                 : '',
-              words: $set.tweeters.map(i => `${i.key};${i.value}`).join('\n'),
             })
           ).content.toString();
         } catch (e) {
-          this.logger.error(e, e.message, `WordartService/${key}/${tags}`);
+          this.logger.error(
+            e,
+            e.message,
+            `WordartService/${key}/${tags || '*'}`,
+          );
         }
 
-        if (content) {
-          if (isJSON(content)) {
-            const cloud = JSON.parse(content);
+        if (isJSON(content)) {
+          const cloud = JSON.parse(content);
 
-            this.logger.log(
-              pick(cloud, ['statusCode', 'statusText']),
-              `WordartService/${key}/${tags}`,
-            );
+          this.logger.log(
+            pick(cloud, ['statusCode', 'statusText']),
+            `WordartService/${key}/${tags || '*'}`,
+          );
 
-            if (cloud.statusCode === 200)
-              await this.cachedWordArtsTable.updateOne(
-                { _id: `${key}|${tags}` },
-                {
-                  $set: {
-                    ...$set,
-                    json: cloud.json,
-                    tweeters: $set.tweeters.map(i => i.key),
-                  },
+          if (cloud.statusCode === 200)
+            await this.cachedWordArtsTable.updateOne(
+              { _id: `${key}|${tags}` },
+              {
+                $set: {
+                  ...$set,
+                  json: cloud.json,
+                  tweeters: $set.tweeters.map(i => i.key),
                 },
-                { upsert: true },
-              );
-            else await this.cache(key, tags);
-          } else
-            this.logger.error(
-              content,
-              'invalid JSON content',
-              `WordartService/${key}/${tags}`,
+              },
+              { cache: true },
             );
-        }
+          else await this.cache(key, tags);
+        } else
+          this.logger.error(
+            content,
+            'invalid JSON content',
+            `WordartService/${key}/${tags || '*'}`,
+          );
       }
     }
 

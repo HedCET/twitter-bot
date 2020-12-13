@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
     "baseUrl": "./",
     "declaration": true,
     "emitDecoratorMetadata": true,
@@ -10,6 +11,5 @@
     "removeComments": true,
     "sourceMap": true,
     "target": "es6"
-  },
-  "exclude": ["node_modules"]
+  }
 }
