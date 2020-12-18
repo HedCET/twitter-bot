@@ -6,7 +6,7 @@ import { appProps, model, name } from './users.table';
 
 @Injectable()
 export class AppService {
-  constructor(@InjectModel(name) private readonly usersTable: Model<model>) {}
+  constructor(@InjectModel(name) private readonly usersTable: Model<model>) { }
 
   // search route handler
   async search(query: string = '', tags: string = '') {
@@ -23,9 +23,9 @@ export class AppService {
       hits.length < 10
         ? hits.length
         : await this.usersTable.countDocuments({
-            name,
-            ...(tags && { tags: { $in: tags.split('|') } }),
-          });
+          name,
+          ...(tags && { tags: { $in: tags.split('|') } }),
+        });
 
     return { hits, total };
   }
