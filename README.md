@@ -4,4 +4,4 @@ Twitter Malyalam Bot Features
 * trending malayalam tweeters in last 15 minutes ([word-art](https://crawlamma.web.app))
 * automated storyteller in malayalam (inspired from [this](https://dribbble.com/shots/4795633-Automated-Storyteller-AKA-Bots-Bots-Bots))
 
-build with NestJS, required [variables](https://github.com/HedCET/twitter-bot/blob/master/src/env.validations.ts#L8)
+build with NestJS, try this [branch](https://github.com/HedCET/twitter-bot/tree/swamini) to create similar one
