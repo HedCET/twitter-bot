@@ -19,7 +19,7 @@ const bootstrap = async () => {
   app.enableCors();
 
   app.use(helmet());
-  app.use(expressRateLimit({ max: 30, windowMs: 1000 * 60 }));
+  app.use(expressRateLimit({ max: 60, windowMs: 1000 * 60 * 5 }));
   app.use(compression());
 
   app.useGlobalPipes(

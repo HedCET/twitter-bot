@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import * as BigInt from 'big-integer';
-import { groupBy, random, sortBy } from 'lodash';
+import { groupBy, random, sample, sortBy } from 'lodash';
 import * as moment from 'moment';
 import { Model } from 'mongoose';
 // import Twitter from 'twitter-lite';
@@ -223,7 +223,7 @@ export class CrawlammaService {
               _id !== tweeter._id &&
               !(await this.recentTable.findOneAndUpdate(
                 { _id: `${_id}|${status.id_str}` },
-                { $set: {} },
+                { $set: { text: status.full_text } },
                 { upsert: true },
               ))
             ) {
@@ -241,11 +241,7 @@ export class CrawlammaService {
                   )
                     cache.remainingTweets = [
                       ...(cache.remainingTweets ?? []),
-                      {
-                        tweeterId: status.user.id_str,
-                        tweetFrequency: tweeter.tweetFrequency,
-                        tweetId: status.id_str,
-                      },
+                      { tweeterId: status.user.id_str, tweetId: status.id_str },
                     ];
                 } else {
                   // sampler
@@ -260,7 +256,7 @@ export class CrawlammaService {
 
                       // prettier-ignore
                       for (const group of Object.values(groupBy(cache.remainingTweets, 'tweeterId')))
-                        remainingTweets.push(sortBy(group, ['tweetFrequency']).pop());
+                        remainingTweets.push(sample(group));
 
                       for (
                         i = 5 - cache.retweeted;
@@ -360,7 +356,6 @@ export class CrawlammaService {
                                 ...(cache.remainingTweets ?? []),
                                 {
                                   tweeterId: status.user.id_str,
-                                  tweetFrequency: tweeter.tweetFrequency,
                                   tweetId: status.id_str,
                                 },
                               ];
@@ -384,7 +379,6 @@ export class CrawlammaService {
                         ...(cache.remainingTweets ?? []),
                         {
                           tweeterId: status.user.id_str,
-                          tweetFrequency: tweeter.tweetFrequency,
                           tweetId: status.id_str,
                         },
                       ];
@@ -407,7 +401,7 @@ export class CrawlammaService {
                       await client.post('account/update_profile', {
                         description:
                           160 < description.length
-                            ? description.substr(0, 160)
+                            ? `${description.substr(0, 159)}~`
                             : description,
                         skip_status: true,
                       });

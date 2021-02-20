@@ -44,4 +44,10 @@ export class AppController {
   user(@User('_id') _id: string) {
     return _id;
   }
+
+  @Get('recent')
+  @UseInterceptors(CacheInterceptor)
+  async recent() {
+    return await this.appService.recent();
+  }
 }

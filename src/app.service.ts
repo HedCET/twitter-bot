@@ -2,11 +2,19 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
-import { appProps, model, name } from './users.table';
+import { model as recentModel, name as recentToken } from './recent.table';
+import {
+  appProps,
+  model as usersModel,
+  name as usersToken,
+} from './users.table';
 
 @Injectable()
 export class AppService {
-  constructor(@InjectModel(name) private readonly usersTable: Model<model>) { }
+  constructor(
+    @InjectModel(recentToken) private readonly recentTable: Model<recentModel>,
+    @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
+  ) {}
 
   // search route handler
   async search(query: string = '', tags: string = '') {
@@ -23,10 +31,19 @@ export class AppService {
       hits.length < 10
         ? hits.length
         : await this.usersTable.countDocuments({
-          name,
-          ...(tags && { tags: { $in: tags.split('|') } }),
-        });
+            name,
+            ...(tags && { tags: { $in: tags.split('|') } }),
+          });
 
     return { hits, total };
+  }
+
+  // recent route handler
+  async recent() {
+    return await this.recentTable.find(
+      { text: { $exists: true } },
+      {},
+      { limit: 1000, sort: { _id: 'asc' } },
+    );
   }
 }
