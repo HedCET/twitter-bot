@@ -1,17 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
-import * as BigInt from 'big-integer';
+import BigInt from 'big-integer';
 import { groupBy, random, sample, sortBy } from 'lodash';
-import * as moment from 'moment';
+import moment from 'moment';
 import { Model } from 'mongoose';
-// import Twitter from 'twitter-lite';
+import Twitter from 'twitter-lite';
 
 import { model as recentModel, name as recentToken } from './recent.table';
 import { searchQuery, tweetInterface } from './twitter.interface';
 import { model as usersModel, name as usersToken } from './users.table';
 
-const Twitter = require('twitter-lite');
+// const Twitter = require('twitter-lite');
 
 @Injectable()
 export class CrawlammaService {
@@ -67,11 +67,7 @@ export class CrawlammaService {
         try {
           await client.get('account/verify_credentials');
         } catch (e) {
-          this.logger.error(
-            e,
-            'account/verify_credentials',
-            `CrawlammaService/${name}`,
-          );
+          this.logger.error(e, 'account/verify_credentials', name);
 
           // accessRevoked
           // await this.usersTable.updateOne(
@@ -121,7 +117,7 @@ export class CrawlammaService {
                 ),
               )
               .asMilliseconds()}ms to reset`,
-            `CrawlammaService/${name}`,
+            name,
           );
 
           if (!response.statuses.length) break;
@@ -229,7 +225,7 @@ export class CrawlammaService {
             ) {
               this.logger.log(
                 `${status.user.screen_name}/${status.id_str}`,
-                `CrawlammaService/${name}`,
+                name,
               );
 
               newTweets++;
@@ -274,8 +270,8 @@ export class CrawlammaService {
                         } catch (e) {
                           this.logger.error(
                             e,
-                            `*/${remainingTweet.tweetId}`,
-                            `TwitterService/${name}`,
+                            `statuses/retweet - */${remainingTweet.tweetId}`,
+                            name,
                           );
 
                           if ('errors' in e)
@@ -286,7 +282,7 @@ export class CrawlammaService {
                                   {
                                     $set: {
                                       blockedTimeout: moment()
-                                        .add(90, 'days')
+                                        .add(30, 'days')
                                         .toDate(),
                                     },
                                   },
@@ -332,8 +328,8 @@ export class CrawlammaService {
                       } catch (e) {
                         this.logger.error(
                           e,
-                          `${status.user.screen_name}/${status.id_str}`,
-                          `CrawlammaService/${name}`,
+                          `statuses/retweet - ${status.user.screen_name}/${status.id_str}`,
+                          name,
                         );
 
                         if ('errors' in e)
@@ -344,7 +340,7 @@ export class CrawlammaService {
                                 {
                                   $set: {
                                     blockedTimeout: moment()
-                                      .add(90, 'days')
+                                      .add(30, 'days')
                                       .toDate(),
                                   },
                                 },
@@ -406,11 +402,7 @@ export class CrawlammaService {
                         skip_status: true,
                       });
                     } catch (e) {
-                      this.logger.error(
-                        e,
-                        description,
-                        `CrawlammaService/${name}`,
-                      );
+                      this.logger.error(e, `account/update_profile`, name);
                     }
 
                     if (
@@ -453,7 +445,7 @@ export class CrawlammaService {
       await this.usersTable.deleteMany({
         roles: { $size: 0 },
         tweeted_at: {
-          $lt: moment().subtract(90, 'days').toDate(),
+          $lt: moment().subtract(30, 'days').toDate(),
         },
       });
 

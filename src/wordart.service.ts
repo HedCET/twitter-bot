@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { connect, connection } from 'amqplib';
 import { request } from 'amqplib-rpc';
 import { capitalize, compact, find, pick, random, shuffle } from 'lodash';
-import * as moment from 'moment';
+import moment from 'moment';
 import { Model } from 'mongoose';
 import isJSON from 'validator/lib/isJSON';
 
@@ -40,7 +40,7 @@ export class WordartService {
   // wordart route handler
   async wordart(key: string = '', tags: string = '') {
     const cachedWordArts = await this.cachedWordArtsTable.find(
-      { _id: { $in: this.services.map(i => `${i}|${tags}`) } },
+      { _id: { $in: this.services.map((i) => `${i}|${tags}`) } },
       { json: 0 },
     );
     // .populate({ select: '_id,name', path: 'users', match: { tags } });
@@ -58,7 +58,7 @@ export class WordartService {
       else {
         this.services
           .map(
-            service =>
+            (service) =>
               find(cachedWordArts, { _id: `${service}|${tags}` }) ?? {
                 _id: `${service}|${tags}`,
                 startedAt: 0,
@@ -87,7 +87,7 @@ export class WordartService {
   // cache wordart
   private async cache(key: string = '', tags: string = '') {
     if (!key)
-      this.services.forEach(async service => await this.cache(service, tags));
+      this.services.forEach(async (service) => await this.cache(service, tags));
 
     if (-1 < this.services.indexOf(key)) {
       const prop =
@@ -141,18 +141,14 @@ export class WordartService {
         try {
           content = (
             await request(this.amqp, env.WORDART_AMQP_QUEUE_NAME, {
-              words: $set.tweeters.map(i => `${i.key};${i.value}`).join('\n'),
+              words: $set.tweeters.map((i) => `${i.key};${i.value}`).join('\n'),
               image: this.urls.length
                 ? this.urls[this.index++ % this.urls.length]
                 : '',
             })
           ).content.toString();
         } catch (e) {
-          this.logger.error(
-            e,
-            e.message,
-            `WordartService/${key}/${tags || '*'}`,
-          );
+          this.logger.error(e, e.message, `${key}/${tags || '*'}`);
         }
 
         if (isJSON(content)) {
@@ -160,7 +156,7 @@ export class WordartService {
 
           this.logger.log(
             pick(cloud, ['statusCode', 'statusText']),
-            `WordartService/${key}/${tags || '*'}`,
+            `${key}/${tags || '*'}`,
           );
 
           if (cloud.statusCode === 200)
@@ -170,7 +166,7 @@ export class WordartService {
                 $set: {
                   ...$set,
                   json: cloud.json,
-                  tweeters: $set.tweeters.map(i => i.key),
+                  tweeters: $set.tweeters.map((i) => i.key),
                 },
               },
               { cache: true },
@@ -180,7 +176,7 @@ export class WordartService {
           this.logger.error(
             content,
             'invalid JSON content',
-            `WordartService/${key}/${tags || '*'}`,
+            `${key}/${tags || '*'}`,
           );
       }
     }

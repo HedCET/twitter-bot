@@ -1,9 +1,9 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import * as compression from 'compression';
-import * as expressRateLimit from 'express-rate-limit';
-import * as helmet from 'helmet';
+import compression from 'compression';
+import expressRateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 
 import { AppModule } from './app.module';
 import { env } from './env.validations';

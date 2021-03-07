@@ -1,8 +1,8 @@
-import * as dotenv from 'dotenv';
-import * as fs from 'fs';
-import * as joi from '@hapi/joi';
+import dotenv from 'dotenv';
+import fs from 'fs';
+import joi from '@hapi/joi';
 import { compact, pick } from 'lodash';
-import * as path from 'path';
+import path from 'path';
 import isURL from 'validator/lib/isURL';
 
 const schema = joi.object({
