@@ -8,7 +8,12 @@ import { Model } from 'mongoose';
 import Twitter from 'twitter-lite';
 
 import { model as recentModel, name as recentToken } from './recent.table';
-import { searchQuery, tweetInterface } from './twitter.interface';
+import {
+  friendsQuery,
+  searchQuery,
+  tweetInterface,
+  tweeterInterface,
+} from './twitter.interface';
 import { model as usersModel, name as usersToken } from './users.table';
 
 // const Twitter = require('twitter-lite');
@@ -22,7 +27,7 @@ export class CrawlammaService {
     @InjectModel(recentToken)
     private readonly recentTable: Model<recentModel>,
     @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
-  ) {}
+  ) { }
 
   @Cron('*/15 * * * * *')
   private async scheduler(twitterApp = 'crawlamma') {
@@ -62,6 +67,8 @@ export class CrawlammaService {
           consumer_key,
           consumer_secret,
         });
+
+        this.logger.log(`account/verify_credentials`, name);
 
         // verify credentials
         try {
@@ -110,7 +117,7 @@ export class CrawlammaService {
               'x-rate-limit-remaining',
             )}/${response._headers.get(
               'x-rate-limit-limit',
-            )} requests, +${moment
+            )} search/tweets requests, +${moment
               .duration(
                 moment(response._headers.get('x-rate-limit-reset'), ['X']).diff(
                   moment(),
@@ -178,6 +185,30 @@ export class CrawlammaService {
               $set.tweetFrequency = moment
                 .duration(tweetedAt.diff(tweeter.tweetedAt))
                 .asDays();
+
+              // update friends list
+              if (
+                !status.user.following &&
+                moment
+                  .duration(moment().diff(moment($set.createdAt)))
+                  .asMonths() <= 1 &&
+                0.25 < $set.tweetFrequency
+              ) {
+                this.logger.log(
+                  `friendships/create?follow=true&screen_name=${status.user.screen_name}`,
+                  name,
+                );
+
+                try {
+                  // friendships/create => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/follow-search-get-users/api-reference/post-friendships-create
+                  await client.post('friendships/create', {
+                    follow: true,
+                    user_id: status.user.id_str,
+                  });
+                } catch (e) {
+                  this.logger.error(e, `friendships/create`, name);
+                }
+              }
 
               if (
                 tweeter.followers &&
@@ -262,6 +293,11 @@ export class CrawlammaService {
                         // prettier-ignore
                         const [remainingTweet] = remainingTweets.splice(random(remainingTweets.length - 1), 1);
 
+                        this.logger.log(
+                          `statuses/retweet?id=${remainingTweet.tweetId}`,
+                          name,
+                        );
+
                         try {
                           // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
                           await client.post('statuses/retweet', {
@@ -320,6 +356,11 @@ export class CrawlammaService {
                     ) {
                       cache.retweeted += 1;
 
+                      this.logger.log(
+                        `statuses/retweet?id=${status.id_str}`,
+                        name,
+                      );
+
                       try {
                         // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
                         await client.post('statuses/retweet', {
@@ -362,8 +403,8 @@ export class CrawlammaService {
                       }
                     } else if (
                       5 <
-                        status.full_text.replace(/[^\u0d00-\u0d7f]/g, '')
-                          .length &&
+                      status.full_text.replace(/[^\u0d00-\u0d7f]/g, '')
+                        .length &&
                       !(status.entities?.urls ?? []).filter(
                         (entity) =>
                           !entity.expanded_url.match(
@@ -390,7 +431,16 @@ export class CrawlammaService {
 
                     const description = `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`
                       .replace(/\s+/g, ' ')
+                      .replace(/https?:\/\//gi, '')
                       .trim();
+
+                    this.logger.log(
+                      `account/update_profile?skip_status=true&description=${160 < description.length
+                        ? `${description.substr(0, 159)}~`
+                        : description
+                      }`,
+                      name,
+                    );
 
                     try {
                       // account/update_profile => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile
@@ -405,10 +455,7 @@ export class CrawlammaService {
                       this.logger.error(e, `account/update_profile`, name);
                     }
 
-                    if (
-                      cache.tweetFrequency * 24 * 60 <
-                      (cache.promotedUsers ?? []).length
-                    )
+                    if (1440 * 7 < (cache.promotedUsers ?? []).length)
                       cache.promotedUsers = [];
                     else
                       cache.promotedUsers = [
@@ -421,6 +468,76 @@ export class CrawlammaService {
           }
 
           if (!newTweets) break;
+        }
+
+        // update friends list
+        if (moment(cache.friendsUpdatedAt ?? 0).isBefore(moment())) {
+          cache.friendsUpdatedAt = moment().add(15, 'minute');
+
+          const requestQuery: friendsQuery = {
+            count: 200,
+            cursor: '-1',
+            skip_status: true,
+          };
+
+          for (let i = 0; i < 15; i++) {
+            // friends/list => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/follow-search-get-users/api-reference/get-friends-list
+            const response: {
+              _headers: { [key: string]: any };
+              next_cursor_str: string;
+              users: tweeterInterface[];
+            } = await client.get('friends/list', requestQuery);
+
+            this.logger.log(
+              `remaining ${response._headers.get(
+                'x-rate-limit-remaining',
+              )}/${response._headers.get(
+                'x-rate-limit-limit',
+              )} friends/list requests, +${moment
+                .duration(
+                  moment(response._headers.get('x-rate-limit-reset'), [
+                    'X',
+                  ]).diff(moment()),
+                )
+                .asMilliseconds()}ms to reset`,
+              name,
+            );
+
+            // set cursor for next iteration
+            requestQuery.cursor = response.next_cursor_str;
+
+            for await (const friend of response.users)
+              if (
+                1 <
+                moment
+                  .duration(
+                    moment().diff(
+                      moment(friend.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']),
+                    ),
+                  )
+                  .asMonths()
+              ) {
+                this.logger.log(
+                  `friendships/destroy?screen_name=${friend.screen_name}`,
+                  name,
+                );
+
+                try {
+                  // friendships/destroy => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/follow-search-get-users/api-reference/post-friendships-destroy
+                  await client.post('friendships/destroy', {
+                    user_id: friend.id_str,
+                  });
+                } catch (e) {
+                  this.logger.error(e, `friendships/destroy`, name);
+                }
+              }
+
+            if (
+              !response.users.length ||
+              response.users.length < requestQuery.count
+            )
+              break;
+          }
         }
 
         const limit = await this.recentTable.findOne(

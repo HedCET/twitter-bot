@@ -12,6 +12,7 @@ export interface tweeterInterface {
   description: string;
   favourites_count: number;
   followers_count: number;
+  following: boolean;
   friends_count: number;
   id_str: string;
   listed_count: number;
@@ -26,4 +27,10 @@ export interface tweetInterface {
   id_str: string;
   entities?: any;
   user: tweeterInterface;
+}
+
+export interface friendsQuery {
+  count: number;
+  cursor: string;
+  skip_status: boolean;
 }
