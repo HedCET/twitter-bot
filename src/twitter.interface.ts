@@ -1,4 +1,4 @@
-export interface searchQuery {
+export interface searchParams {
   count: number;
   lang: string;
   max_id?: string;
@@ -29,7 +29,7 @@ export interface tweetInterface {
   user: tweeterInterface;
 }
 
-export interface friendsQuery {
+export interface friendsParams {
   count: number;
   cursor: string;
   skip_status: boolean;

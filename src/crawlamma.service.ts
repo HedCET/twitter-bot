@@ -9,11 +9,15 @@ import Twitter from 'twitter-lite';
 
 import { model as recentModel, name as recentToken } from './recent.table';
 import {
-  friendsQuery,
-  searchQuery,
+  friendsParams,
+  searchParams,
   tweetInterface,
   tweeterInterface,
 } from './twitter.interface';
+import {
+  model as settingsModel,
+  name as settingsToken,
+} from './settings.table';
 import { model as usersModel, name as usersToken } from './users.table';
 
 // const Twitter = require('twitter-lite');
@@ -26,8 +30,10 @@ export class CrawlammaService {
     private readonly logger: Logger,
     @InjectModel(recentToken)
     private readonly recentTable: Model<recentModel>,
+    @InjectModel(settingsToken)
+    private readonly settingsTable: Model<settingsModel>,
     @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
-  ) { }
+  ) {}
 
   @Cron('*/15 * * * * *')
   private async scheduler(twitterApp = 'crawlamma') {
@@ -97,7 +103,7 @@ export class CrawlammaService {
         // average tweet frequency
         cache.tweetFrequency = avg?.avg ?? 7;
 
-        const requestQuery: searchQuery = {
+        const params: searchParams = {
           count: 100,
           lang: 'ml',
           q: '%2A', // '*',
@@ -110,7 +116,7 @@ export class CrawlammaService {
           const response: {
             _headers: { [key: string]: any };
             statuses: tweetInterface[];
-          } = await client.get('search/tweets', requestQuery);
+          } = await client.get('search/tweets', params);
 
           this.logger.log(
             `remaining ${response._headers.get(
@@ -133,9 +139,7 @@ export class CrawlammaService {
           const statuses = sortBy(response.statuses, ['id_str']);
 
           // set max_id for next iteration
-          requestQuery.max_id = BigInt(statuses[0].id_str)
-            .subtract(1)
-            .toString();
+          params.max_id = BigInt(statuses[0].id_str).subtract(1).toString();
 
           // new tweets counter
           let newTweets = 0;
@@ -195,7 +199,7 @@ export class CrawlammaService {
                 0.25 < $set.tweetFrequency
               ) {
                 this.logger.log(
-                  `friendships/create?follow=true&screen_name=${status.user.screen_name}`,
+                  `friendships/create?screen_name=${status.user.screen_name}`,
                   name,
                 );
 
@@ -403,8 +407,8 @@ export class CrawlammaService {
                       }
                     } else if (
                       5 <
-                      status.full_text.replace(/[^\u0d00-\u0d7f]/g, '')
-                        .length &&
+                        status.full_text.replace(/[^\u0d00-\u0d7f]/g, '')
+                          .length &&
                       !(status.entities?.urls ?? []).filter(
                         (entity) =>
                           !entity.expanded_url.match(
@@ -435,9 +439,10 @@ export class CrawlammaService {
                       .trim();
 
                     this.logger.log(
-                      `account/update_profile?skip_status=true&description=${160 < description.length
-                        ? `${description.substr(0, 159)}~`
-                        : description
+                      `account/update_profile?description=${
+                        160 < description.length
+                          ? `${description.substr(0, 159)}~`
+                          : description
                       }`,
                       name,
                     );
@@ -474,7 +479,7 @@ export class CrawlammaService {
         if (moment(cache.friendsUpdatedAt ?? 0).isBefore(moment())) {
           cache.friendsUpdatedAt = moment().add(15, 'minute');
 
-          const requestQuery: friendsQuery = {
+          const params: friendsParams = {
             count: 200,
             cursor: '-1',
             skip_status: true,
@@ -486,7 +491,7 @@ export class CrawlammaService {
               _headers: { [key: string]: any };
               next_cursor_str: string;
               users: tweeterInterface[];
-            } = await client.get('friends/list', requestQuery);
+            } = await client.get('friends/list', params);
 
             this.logger.log(
               `remaining ${response._headers.get(
@@ -503,8 +508,8 @@ export class CrawlammaService {
               name,
             );
 
-            // set cursor for next iteration
-            requestQuery.cursor = response.next_cursor_str;
+            if (response?.next_cursor_str)
+              params.cursor = response.next_cursor_str;
 
             for await (const friend of response.users)
               if (
@@ -532,11 +537,92 @@ export class CrawlammaService {
                 }
               }
 
-            if (
-              !response.users.length ||
-              response.users.length < requestQuery.count
-            )
+            if (!response.users.length || response.users.length < params.count)
               break;
+          }
+        }
+
+        // auto reply
+        if (moment(cache.autoReplyUpdatedAt ?? 0).isBefore(moment())) {
+          cache.autoReplyUpdatedAt = moment().add(15, 'minute');
+
+          const params: { count: number; cursor?: string } = {
+            count: 50,
+          };
+
+          for (let i = 0; i < 15; i++) {
+            // direct_messages/events/list => https://developer.twitter.com/en/docs/twitter-api/v1/direct-messages/sending-and-receiving/api-reference/list-events
+            const response: {
+              _headers: { [key: string]: any };
+              events: {
+                created_timestamp: string;
+                message_create: {
+                  sender_id: string;
+                };
+              }[];
+              next_cursor: string;
+            } = await client.get('direct_messages/events/list', params);
+
+            this.logger.log(
+              `remaining ${response._headers.get(
+                'x-rate-limit-remaining',
+              )}/${response._headers.get(
+                'x-rate-limit-limit',
+              )} direct_messages/events/list requests, +${moment
+                .duration(
+                  moment(response._headers.get('x-rate-limit-reset'), [
+                    'X',
+                  ]).diff(moment()),
+                )
+                .asMilliseconds()}ms to reset`,
+              name,
+            );
+
+            if (!(response?.events ?? []).length) break;
+            if (response?.next_cursor) params.cursor = response.next_cursor;
+
+            for (const event of response?.events ?? []) {
+              if (
+                moment()
+                  .subtract(60, 'minutes')
+                  .isAfter(moment(event.created_timestamp, ['x']))
+              ) {
+                i = 15;
+                break;
+              }
+
+              if (
+                !(await this.settingsTable.findOneAndUpdate(
+                  { _id: `message_create|${event.message_create.sender_id}` },
+                  { $set: {} },
+                  { upsert: true },
+                ))
+              ) {
+                this.logger.log(
+                  `direct_messages/events/new?recipient_id=${event.message_create.sender_id}`,
+                  name,
+                );
+
+                try {
+                  // direct_messages/events/new => https://developer.twitter.com/en/docs/twitter-api/v1/direct-messages/sending-and-receiving/api-reference/new-event
+                  await client.post('direct_messages/events/new', {
+                    event: {
+                      type: 'message_create',
+                      message_create: {
+                        message_data: {
+                          text: `https://twitter.com/MyProfileThemes/status/1362392625685229569`,
+                        },
+                        target: {
+                          recipient_id: event.message_create.sender_id,
+                        },
+                      },
+                    },
+                  });
+                } catch (e) {
+                  this.logger.error(e, `direct_messages/events/new`, name);
+                }
+              }
+            }
           }
         }
 

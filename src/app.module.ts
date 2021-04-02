@@ -24,6 +24,10 @@ import {
   schema as twitterAppsTableSchema,
 } from './twitterApps.table';
 import {
+  name as settingsTableName,
+  schema as settingsTableSchema,
+} from './settings.table';
+import {
   name as usersTableName,
   schema as usersTableSchema,
 } from './users.table';
@@ -43,6 +47,7 @@ import { WordartService } from './wordart.service';
       { name: cachedWordArtsTableName, schema: cachedWordArtsTableSchema },
       { name: recentTableName, schema: recentTableSchema },
       { name: twitterAppsTableName, schema: twitterAppsTableSchema },
+      { name: settingsTableName, schema: settingsTableSchema },
       { name: usersTableName, schema: usersTableSchema },
     ]),
     JwtModule.register({ secret: env.SECRET }),
