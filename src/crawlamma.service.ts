@@ -33,7 +33,7 @@ export class CrawlammaService {
     @InjectModel(settingsToken)
     private readonly settingsTable: Model<settingsModel>,
     @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
-  ) {}
+  ) { }
 
   @Cron('*/15 * * * * *')
   private async scheduler(twitterApp = 'crawlamma') {
@@ -195,7 +195,7 @@ export class CrawlammaService {
                 !status.user.following &&
                 moment
                   .duration(moment().diff(moment($set.createdAt)))
-                  .asMonths() <= 1 &&
+                  .asDays() <= 7 &&
                 0.25 < $set.tweetFrequency
               ) {
                 this.logger.log(
@@ -407,8 +407,8 @@ export class CrawlammaService {
                       }
                     } else if (
                       5 <
-                        status.full_text.replace(/[^\u0d00-\u0d7f]/g, '')
-                          .length &&
+                      status.full_text.replace(/[^\u0d00-\u0d7f]/g, '')
+                        .length &&
                       !(status.entities?.urls ?? []).filter(
                         (entity) =>
                           !entity.expanded_url.match(
@@ -439,10 +439,9 @@ export class CrawlammaService {
                       .trim();
 
                     this.logger.log(
-                      `account/update_profile?description=${
-                        160 < description.length
-                          ? `${description.substr(0, 159)}~`
-                          : description
+                      `account/update_profile?description=${160 < description.length
+                        ? `${description.substr(0, 159)}~`
+                        : description
                       }`,
                       name,
                     );
@@ -513,14 +512,14 @@ export class CrawlammaService {
 
             for await (const friend of response.users)
               if (
-                1 <
+                7 <
                 moment
                   .duration(
                     moment().diff(
                       moment(friend.created_at, ['ddd MMM D HH:mm:ss ZZ YYYY']),
                     ),
                   )
-                  .asMonths()
+                  .asDays()
               ) {
                 this.logger.log(
                   `friendships/destroy?screen_name=${friend.screen_name}`,
