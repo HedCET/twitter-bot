@@ -1,3 +1,4 @@
+import fetch from 'cross-fetch';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import joi from '@hapi/joi';
@@ -17,32 +18,36 @@ const schema = joi.object({
     .default('http://localhost:8080/twitter_callback'),
   WORDART_AMQP_QUEUE_NAME: joi.string().required(),
   WORDART_AMQP_URL: joi.string().required().uri(),
-  WORDART_IMAGE_URLS: joi.string(),
+  WORDART_FILE_URL: joi.string().uri(),
 });
 
+const ENV_FILEPATH = path.resolve(process.env.ENV_FILEPATH || './.env');
 const { error, value } = schema.validate({
   ...dotenv.parse(
-    fs.existsSync(path.resolve(process.env.ENV_FILEPATH || './.development'))
-      ? fs.readFileSync(
-          path.resolve(process.env.ENV_FILEPATH || './.development'),
-          'utf8',
-        )
-      : '',
+    fs.existsSync(ENV_FILEPATH) ? fs.readFileSync(ENV_FILEPATH, 'utf8') : '',
   ),
   ...pick(process.env, [...schema._ids._byKey.keys()]),
 });
 
 if (error) throw error;
 
-// custom loading for WORDART_IMAGE_URLS
-if (!value.WORDART_IMAGE_URLS && fs.existsSync(path.resolve('./.wordarts')))
+// load WORDART_IMAGE_URLS from local text file
+if (fs.existsSync(path.resolve('./.wordarts')))
   value.WORDART_IMAGE_URLS = fs
     .readFileSync(path.resolve('./.wordarts'), 'utf8')
-    .replace(/\n/g, '|');
+    .split(/\s*[\r\n]+\s*/g)
+    .filter((url) => isURL(url))
+    .join('|');
 
-// custom validation for WORDART_IMAGE_URLS
-if (value.WORDART_IMAGE_URLS)
-  for (const url of compact(value.WORDART_IMAGE_URLS.split('|')))
-    if (!isURL(url)) throw new Error(`invalid URL WORDART_IMAGE_URLS ${url}`);
+// load WORDART_IMAGE_URLS from remote text file
+if (value.WORDART_FILE_URL)
+  fetch(value.WORDART_FILE_URL).then(async (response) => {
+    if (response.status !== 200)
+      throw new Error(`invalid URL ${value.WORDART_FILE_URL}`);
+    value.WORDART_IMAGE_URLS = (await response.text())
+      .split(/\s*[\r\n]+\s*/g)
+      .filter((url) => isURL(url))
+      .join('|');
+  });
 
 export const env: { [key: string]: any } = value;

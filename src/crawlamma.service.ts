@@ -33,7 +33,7 @@ export class CrawlammaService {
     @InjectModel(settingsToken)
     private readonly settingsTable: Model<settingsModel>,
     @InjectModel(usersToken) private readonly usersTable: Model<usersModel>,
-  ) { }
+  ) {}
 
   @Cron('*/15 * * * * *')
   private async scheduler(twitterApp = 'crawlamma') {
@@ -407,8 +407,8 @@ export class CrawlammaService {
                       }
                     } else if (
                       5 <
-                      status.full_text.replace(/[^\u0d00-\u0d7f]/g, '')
-                        .length &&
+                        status.full_text.replace(/[^\u0d00-\u0d7f]/g, '')
+                          .length &&
                       !(status.entities?.urls ?? []).filter(
                         (entity) =>
                           !entity.expanded_url.match(
@@ -433,15 +433,17 @@ export class CrawlammaService {
                   ) {
                     cache.profileUpdatedAt = moment().add(1, 'minute');
 
-                    const description = `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`
-                      .replace(/\s+/g, ' ')
-                      .replace(/https?:\/\//gi, '')
-                      .trim();
+                    const description =
+                      `${status.user.name} (@${status.user.screen_name}) ${status.user.description}`
+                        .replace(/\s+/g, ' ')
+                        .replace(/https?:\/\//gi, '')
+                        .trim();
 
                     this.logger.log(
-                      `account/update_profile?description=${160 < description.length
-                        ? `${description.substr(0, 159)}~`
-                        : description
+                      `account/update_profile?description=${
+                        160 < description.length
+                          ? `${description.substr(0, 159)}~`
+                          : description
                       }`,
                       name,
                     );
