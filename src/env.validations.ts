@@ -7,6 +7,7 @@ import path from 'path';
 import isURL from 'validator/lib/isURL';
 
 const schema = joi.object({
+  ADMIN_TWITTER_ID: joi.string().default('124361980'),
   MONGO_URL: joi.string().required().uri(),
   NODE_ENV: joi.string().default('development'),
   PORT: joi.number().default(8080),

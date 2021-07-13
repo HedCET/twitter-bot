@@ -7,6 +7,7 @@ import moment from 'moment';
 import { Model } from 'mongoose';
 import Twitter from 'twitter-lite';
 
+import { env } from './env.validations';
 import { model as recentModel, name as recentToken } from './recent.table';
 import {
   friendsParams,
@@ -73,8 +74,6 @@ export class CrawlammaService {
           consumer_key,
           consumer_secret,
         });
-
-        this.logger.log(`account/verify_credentials`, name);
 
         // verify credentials
         try {
@@ -198,11 +197,6 @@ export class CrawlammaService {
                   .asDays() <= 7 &&
                 0.25 < $set.tweetFrequency
               ) {
-                this.logger.log(
-                  `friendships/create?screen_name=${status.user.screen_name}`,
-                  name,
-                );
-
                 try {
                   // friendships/create => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/follow-search-get-users/api-reference/post-friendships-create
                   await client.post('friendships/create', {
@@ -297,11 +291,6 @@ export class CrawlammaService {
                         // prettier-ignore
                         const [remainingTweet] = remainingTweets.splice(random(remainingTweets.length - 1), 1);
 
-                        this.logger.log(
-                          `statuses/retweet?id=${remainingTweet.tweetId}`,
-                          name,
-                        );
-
                         try {
                           // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
                           await client.post('statuses/retweet', {
@@ -359,11 +348,6 @@ export class CrawlammaService {
                       cache.tweetFrequency < tweeter.tweetFrequency
                     ) {
                       cache.retweeted += 1;
-
-                      this.logger.log(
-                        `statuses/retweet?id=${status.id_str}`,
-                        name,
-                      );
 
                       try {
                         // statuses/retweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-retweet-id
@@ -438,15 +422,6 @@ export class CrawlammaService {
                         .replace(/\s+/g, ' ')
                         .replace(/https?:\/\//gi, '')
                         .trim();
-
-                    this.logger.log(
-                      `account/update_profile?description=${
-                        160 < description.length
-                          ? `${description.substr(0, 159)}~`
-                          : description
-                      }`,
-                      name,
-                    );
 
                     try {
                       // account/update_profile => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/manage-account-settings/api-reference/post-account-update_profile
@@ -523,11 +498,6 @@ export class CrawlammaService {
                   )
                   .asDays()
               ) {
-                this.logger.log(
-                  `friendships/destroy?screen_name=${friend.screen_name}`,
-                  name,
-                );
-
                 try {
                   // friendships/destroy => https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/follow-search-get-users/api-reference/post-friendships-destroy
                   await client.post('friendships/destroy', {
@@ -543,10 +513,11 @@ export class CrawlammaService {
           }
         }
 
-        // auto reply
+        // handle direct messages
         if (moment(cache.autoReplyUpdatedAt ?? 0).isBefore(moment())) {
           cache.autoReplyUpdatedAt = moment().add(15, 'minute');
 
+          const from = moment().subtract(915, 'seconds');
           const params: { count: number; cursor?: string } = {
             count: 50,
           };
@@ -558,6 +529,9 @@ export class CrawlammaService {
               events: {
                 created_timestamp: string;
                 message_create: {
+                  message_data: {
+                    entities: { urls: [{ expanded_url: string }] };
+                  };
                   sender_id: string;
                 };
               }[];
@@ -583,15 +557,12 @@ export class CrawlammaService {
             if (response?.next_cursor) params.cursor = response.next_cursor;
 
             for (const event of response?.events ?? []) {
-              if (
-                moment()
-                  .subtract(60, 'minutes')
-                  .isAfter(moment(event.created_timestamp, ['x']))
-              ) {
+              if (from.isAfter(moment(event.created_timestamp, ['x']))) {
                 i = 15;
                 break;
               }
 
+              // auto reply
               if (
                 !(await this.settingsTable.findOneAndUpdate(
                   { _id: `message_create|${event.message_create.sender_id}` },
@@ -599,11 +570,6 @@ export class CrawlammaService {
                   { upsert: true },
                 ))
               ) {
-                this.logger.log(
-                  `direct_messages/events/new?recipient_id=${event.message_create.sender_id}`,
-                  name,
-                );
-
                 try {
                   // direct_messages/events/new => https://developer.twitter.com/en/docs/twitter-api/v1/direct-messages/sending-and-receiving/api-reference/new-event
                   await client.post('direct_messages/events/new', {
@@ -621,6 +587,38 @@ export class CrawlammaService {
                   });
                 } catch (e) {
                   this.logger.error(e, `direct_messages/events/new`, name);
+                }
+              }
+
+              // unretweet & block
+              if (event.message_create.sender_id === env.ADMIN_TWITTER_ID) {
+                for (const url of event.message_create.message_data?.entities
+                  ?.urls || []) {
+                  const match = (url.expanded_url ?? '').match(
+                    /twitter\.com\/([^/]+)\/status\/([^/&]+)/i,
+                  );
+
+                  if (match) {
+                    try {
+                      // statuses/unretweet => https://developer.twitter.com/en/docs/twitter-api/v1/tweets/post-and-engage/api-reference/post-statuses-unretweet-id
+                      await client.post('statuses/unretweet', { id: match[2] });
+                    } catch (e) {
+                      this.logger.error(
+                        e,
+                        `statuses/unretweet - ${match[1]}/${match[2]}`,
+                        name,
+                      );
+                    }
+
+                    await this.usersTable.updateOne(
+                      { name: match[1] },
+                      {
+                        $set: {
+                          blockedTimeout: moment().add(10, 'years').toDate(),
+                        },
+                      },
+                    );
+                  }
                 }
               }
             }
